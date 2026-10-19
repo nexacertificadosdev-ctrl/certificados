@@ -8,6 +8,13 @@ import type {
   ReporteCertificado,
   PlantillaDocumental,
 } from '../types';
+import {
+  DEFAULT_LOGO_IZQUIERDO,
+  DEFAULT_LOGO_DERECHO,
+  DEFAULT_COLOR_PRIMARIO,
+  DEFAULT_COLOR_SECUNDARIO,
+  DEFAULT_COLOR_TEXTO,
+} from '../utils/themeDefaults';
 
 export const USUARIOS_INICIALES: Usuario[] = [
   {
@@ -371,6 +378,11 @@ export const REPORTE_REFERENCIA_VALVULA: ReporteCertificado = {
   subtituloNormativo: 'Conforme a Código ASME Sec. VIII Div. 1 & Norma API 527',
   codigoFormato: 'FOR-MET-VT-01',
   versionPlantilla: 'v1.0 (Rev 03)',
+  logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
+  logoDerechoUrl: DEFAULT_LOGO_DERECHO,
+  colorPrimario: DEFAULT_COLOR_PRIMARIO,
+  colorSecundario: DEFAULT_COLOR_SECUNDARIO,
+  colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
   clienteId: 'cli-1',
   clienteNombre: 'INGCO INTERNACIONAL S.A.S.',
   direccionServicio: 'Zona Industrial Mamonal Km 7, Cartagena',
@@ -487,7 +499,10 @@ export const REPORTE_REFERENCIA_VALVULA: ReporteCertificado = {
   updatedAt: '2026-10-18T11:30:00.000Z',
 };
 
-export const PLANTILLAS_INICIALES: PlantillaDocumental[] = [
+const plantillasBase: Omit<
+  PlantillaDocumental,
+  'logoIzquierdoUrl' | 'logoDerechoUrl' | 'colorPrimario' | 'colorSecundario' | 'colorTextoEncabezado'
+>[] = [
   // Válvulas
   {
     id: 'plan-vt-1',
@@ -647,6 +662,15 @@ export const PLANTILLAS_INICIALES: PlantillaDocumental[] = [
   },
 ];
 
+export const PLANTILLAS_INICIALES: PlantillaDocumental[] = plantillasBase.map((p) => ({
+  logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
+  logoDerechoUrl: DEFAULT_LOGO_DERECHO,
+  colorPrimario: DEFAULT_COLOR_PRIMARIO,
+  colorSecundario: DEFAULT_COLOR_SECUNDARIO,
+  colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
+  ...p,
+}));
+
 export const REPORTE_REFERENCIA_TUBERIA: ReporteCertificado = {
   id: 'rep-ref-tb-1',
   tempId: 'BORR-002',
@@ -659,6 +683,11 @@ export const REPORTE_REFERENCIA_TUBERIA: ReporteCertificado = {
   subtituloNormativo: 'Conforme a Código ASME B31.3 (Process Piping) Sección 345.4',
   codigoFormato: 'FOR-MET-TB-01',
   versionPlantilla: 'v1.0 (Rev 01)',
+  logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
+  logoDerechoUrl: DEFAULT_LOGO_DERECHO,
+  colorPrimario: DEFAULT_COLOR_PRIMARIO,
+  colorSecundario: DEFAULT_COLOR_SECUNDARIO,
+  colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
   clienteId: 'cli-1',
   clienteNombre: 'INGCO INTERNACIONAL S.A.S.',
   direccionServicio: 'Zona Industrial Mamonal Km 7, Cartagena',
@@ -752,6 +781,11 @@ export const REPORTE_REFERENCIA_PRESION: ReporteCertificado = {
   subtituloNormativo: 'Conforme a Guía Técnica DKD-R 6-1 / NTC-ISO/IEC 17025',
   codigoFormato: 'FOR-MET-PR-01',
   versionPlantilla: 'v1.0 (Rev 02)',
+  logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
+  logoDerechoUrl: DEFAULT_LOGO_DERECHO,
+  colorPrimario: DEFAULT_COLOR_PRIMARIO,
+  colorSecundario: DEFAULT_COLOR_SECUNDARIO,
+  colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
   clienteId: 'cli-1',
   clienteNombre: 'INGCO INTERNACIONAL S.A.S.',
   direccionServicio: 'Zona Industrial Mamonal Km 7, Cartagena',

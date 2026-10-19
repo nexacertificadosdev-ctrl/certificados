@@ -233,6 +233,11 @@ export interface PlantillaDocumental {
   versionRevision: string; // ej. "v1.0 (Rev 03)"
   declaracionTrazabilidadPorDefecto?: string;
   declaracionesConformidadPorDefecto?: string;
+  logoIzquierdoUrl?: string;
+  logoDerechoUrl?: string;
+  colorPrimario?: string;
+  colorSecundario?: string;
+  colorTextoEncabezado?: string;
   activa: boolean;
 }
 
@@ -248,6 +253,11 @@ export interface ReporteCertificado {
   subtituloNormativo?: string;
   codigoFormato?: string;
   versionPlantilla: string;
+  logoIzquierdoUrl?: string;
+  logoDerechoUrl?: string;
+  colorPrimario?: string;
+  colorSecundario?: string;
+  colorTextoEncabezado?: string;
   
   clienteId: string;
   clienteNombre: string;

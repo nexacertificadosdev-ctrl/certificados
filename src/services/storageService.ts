@@ -21,6 +21,13 @@ import {
   SERIES_INICIALES,
   USUARIOS_INICIALES,
 } from './mockData';
+import {
+  DEFAULT_LOGO_IZQUIERDO,
+  DEFAULT_LOGO_DERECHO,
+  DEFAULT_COLOR_PRIMARIO,
+  DEFAULT_COLOR_SECUNDARIO,
+  DEFAULT_COLOR_TEXTO,
+} from '../utils/themeDefaults';
 import { supabaseService } from './supabaseService';
 
 const STORAGE_KEYS = {
@@ -243,7 +250,15 @@ class StorageService {
 
   // Plantillas documentales y configuración de títulos
   public getPlantillas(): PlantillaDocumental[] {
-    return this.get<PlantillaDocumental[]>(STORAGE_KEYS.PLANTILLAS, PLANTILLAS_INICIALES);
+    const list = this.get<PlantillaDocumental[]>(STORAGE_KEYS.PLANTILLAS, PLANTILLAS_INICIALES);
+    return list.map((p) => ({
+      ...p,
+      logoIzquierdoUrl: p.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO,
+      logoDerechoUrl: p.logoDerechoUrl || DEFAULT_LOGO_DERECHO,
+      colorPrimario: p.colorPrimario || DEFAULT_COLOR_PRIMARIO,
+      colorSecundario: p.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
+      colorTextoEncabezado: p.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
+    }));
   }
 
   public getPlantillasPorClasificacion(codigo: CodigoClasificacion): PlantillaDocumental[] {
@@ -337,7 +352,15 @@ class StorageService {
 
   // Reportes
   public getReportes(): ReporteCertificado[] {
-    return this.get<ReporteCertificado[]>(STORAGE_KEYS.REPORTES, REPORTES_INICIALES);
+    const list = this.get<ReporteCertificado[]>(STORAGE_KEYS.REPORTES, REPORTES_INICIALES);
+    return list.map((r) => ({
+      ...r,
+      logoIzquierdoUrl: r.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO,
+      logoDerechoUrl: r.logoDerechoUrl || DEFAULT_LOGO_DERECHO,
+      colorPrimario: r.colorPrimario || DEFAULT_COLOR_PRIMARIO,
+      colorSecundario: r.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
+      colorTextoEncabezado: r.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
+    }));
   }
 
   public getReporteById(id: string): ReporteCertificado | undefined {
@@ -371,6 +394,11 @@ class StorageService {
       subtituloNormativo: reporteData.subtituloNormativo || plantillaElegida.subtituloNormativo,
       codigoFormato: reporteData.codigoFormato || plantillaElegida.codigoFormato,
       versionPlantilla: reporteData.versionPlantilla || plantillaElegida.versionRevision,
+      logoIzquierdoUrl: reporteData.logoIzquierdoUrl || plantillaElegida.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO,
+      logoDerechoUrl: reporteData.logoDerechoUrl || plantillaElegida.logoDerechoUrl || DEFAULT_LOGO_DERECHO,
+      colorPrimario: reporteData.colorPrimario || plantillaElegida.colorPrimario || DEFAULT_COLOR_PRIMARIO,
+      colorSecundario: reporteData.colorSecundario || plantillaElegida.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
+      colorTextoEncabezado: reporteData.colorTextoEncabezado || plantillaElegida.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
       clienteId: reporteData.clienteId || '',
       clienteNombre: reporteData.clienteNombre || '',
       direccionServicio: reporteData.direccionServicio || '',

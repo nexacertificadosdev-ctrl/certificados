@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import type { ReporteCertificado } from '../../types';
 import { Printer, ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { generarQrVerificacion, generarHashIntegridad } from '../../utils/security';
+import {
+  DEFAULT_LOGO_IZQUIERDO,
+  DEFAULT_LOGO_DERECHO,
+  DEFAULT_COLOR_PRIMARIO,
+  DEFAULT_COLOR_SECUNDARIO,
+  DEFAULT_COLOR_TEXTO,
+} from '../../utils/themeDefaults';
 
 interface TuberiaPdfPreviewProps {
   reporte: ReporteCertificado;
@@ -12,6 +19,12 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
   const d = reporte.datosTuberia;
   const numVisible = reporte.numeroConsecutivo || reporte.tempId;
   const esOficial = !!reporte.numeroConsecutivo;
+
+  const colorPrimario = reporte.colorPrimario || DEFAULT_COLOR_PRIMARIO;
+  const colorSecundario = reporte.colorSecundario || DEFAULT_COLOR_SECUNDARIO;
+  const colorTexto = reporte.colorTextoEncabezado || DEFAULT_COLOR_TEXTO;
+  const logoIzquierdo = reporte.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO;
+  const logoDerecho = reporte.logoDerechoUrl || DEFAULT_LOGO_DERECHO;
 
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [hashIntegridad, setHashIntegridad] = useState<string>('');
@@ -63,7 +76,7 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
 
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition cursor-pointer"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             <span>Imprimir / Guardar PDF</span>
@@ -75,17 +88,33 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
       <div className="max-w-[850px] mx-auto space-y-8 print:space-y-0 print:w-full">
         {/* PÁGINA 1 */}
         <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 page-break">
-          {/* Encabezado */}
-          <div className="border border-slate-400 p-3 mb-4">
-            <div className="grid grid-cols-12 items-center text-center">
-              <div className="col-span-3 border-r border-slate-300 pr-2">
-                <div className="bg-slate-900 text-white py-2 px-3 rounded font-bold text-base tracking-widest">
-                  LABMET
-                </div>
-                <span className="text-[9px] text-slate-500 block mt-1">Laboratorio de Ensayos & Metrología</span>
+          {/* Encabezado con Doble Logo y Color Secundario */}
+          <div
+            className="border-2 p-3 mb-4 rounded-xs"
+            style={{ borderColor: colorSecundario }}
+          >
+            <div className="grid grid-cols-12 items-center text-center gap-2">
+              {/* Logo Izquierdo */}
+              <div className="col-span-3 border-r border-slate-300 pr-2 flex items-center justify-center">
+                {logoIzquierdo ? (
+                  <img
+                    src={logoIzquierdo}
+                    alt="Logo Izquierdo"
+                    className="h-16 max-w-full object-contain"
+                  />
+                ) : (
+                  <div className="bg-slate-900 text-white py-2 px-3 rounded font-bold text-sm tracking-widest">
+                    EMPRESA
+                  </div>
+                )}
               </div>
-              <div className="col-span-6 px-2">
-                <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tight">
+
+              {/* Títulos Centrales */}
+              <div className="col-span-6 px-1">
+                <h1
+                  className="text-sm font-black uppercase tracking-tight"
+                  style={{ color: colorSecundario }}
+                >
                   {reporte.tituloReporteEs || 'REPORTE DE PRUEBA HIDROSTÁTICA DE TUBERÍA Y SPOOLS'}
                 </h1>
                 {reporte.tituloReporteEn && (
@@ -93,14 +122,31 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
                     {reporte.tituloReporteEn}
                   </span>
                 )}
-                <span className="text-[10px] text-slate-600 font-medium block mt-0.5">
+                <span
+                  className="text-[10px] font-semibold block mt-0.5"
+                  style={{ color: colorSecundario }}
+                >
                   {reporte.subtituloNormativo || 'Conforme a Código ASME B31.3 (Process Piping) Sección 345.4'}
                 </span>
               </div>
-              <div className="col-span-3 border-l border-slate-300 pl-2 text-right">
-                <span className="text-[9px] text-slate-500 block uppercase">Reporte No.</span>
-                <span className="font-mono font-bold text-sm text-blue-900 block">{numVisible}</span>
-                <span className="text-[9px] text-slate-400 block mt-0.5">Página 1 de 2</span>
+
+              {/* Logo Derecho */}
+              <div className="col-span-3 border-l border-slate-300 pl-2 flex flex-col items-center justify-center">
+                {logoDerecho ? (
+                  <img
+                    src={logoDerecho}
+                    alt="Logo Derecho"
+                    className="h-12 max-w-full object-contain mb-1"
+                  />
+                ) : null}
+                <span className="text-[8px] text-slate-500 block uppercase">Reporte No.</span>
+                <span
+                  className="font-mono font-bold text-xs block"
+                  style={{ color: colorSecundario }}
+                >
+                  {numVisible}
+                </span>
+                <span className="text-[8px] text-slate-400 block">Página 1 de 2</span>
               </div>
             </div>
           </div>
@@ -113,7 +159,10 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
 
           {/* Sección 1: Datos Generales */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               1. Datos del Solicitante y Ubicación
             </div>
             <table className="w-full text-[11px] border-collapse border border-slate-300">
@@ -140,14 +189,22 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
 
           {/* Sección 2: Especificaciones del Spool o Línea */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               2. Identificación del Tramo / Spool de Tubería
             </div>
             <table className="w-full text-[11px] border-collapse border border-slate-300">
               <tbody>
                 <tr>
                   <td className="bg-slate-100 font-bold p-1.5 border border-slate-300 w-1/4">Tag / Identificación Línea:</td>
-                  <td className="p-1.5 border border-slate-300 w-1/4 font-mono font-bold text-blue-900">{d.tagSpoolLinea}</td>
+                  <td
+                    className="p-1.5 border border-slate-300 w-1/4 font-mono font-bold"
+                    style={{ color: colorSecundario }}
+                  >
+                    {d.tagSpoolLinea}
+                  </td>
                   <td className="bg-slate-100 font-bold p-1.5 border border-slate-300 w-1/4">Plano / Isométrico No.:</td>
                   <td className="p-1.5 border border-slate-300 w-1/4 font-mono font-semibold">{d.isometricoPlano}</td>
                 </tr>
@@ -173,16 +230,19 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
 
           {/* Sección 3: Parámetros y Resultados de la Prueba de Presión */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               3. Parámetros de Ensayo de Resistencia y Hermeticidad
             </div>
             <table className="w-full text-[11px] border-collapse border border-slate-300 text-center mb-3">
               <thead>
-                <tr className="bg-slate-100">
+                <tr style={{ backgroundColor: colorPrimario, color: colorTexto }}>
                   <th className="p-1.5 border border-slate-300 text-left">Variable del Ensayo</th>
                   <th className="p-1.5 border border-slate-300">Valor de Diseño</th>
                   <th className="p-1.5 border border-slate-300">Requerido por Norma</th>
-                  <th className="p-1.5 border border-slate-300 bg-blue-50 font-bold">Valor Registrado</th>
+                  <th className="p-1.5 border border-slate-300 font-bold">Valor Registrado</th>
                   <th className="p-1.5 border border-slate-300">Unidad</th>
                 </tr>
               </thead>
@@ -191,28 +251,43 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
                   <td className="p-1.5 border border-slate-300 text-left font-medium">Presión de Prueba Hidrostática</td>
                   <td className="p-1.5 border border-slate-300 font-mono">{d.presionDisenoPsi}</td>
                   <td className="p-1.5 border border-slate-300 font-mono">{d.presionPruebaPsi}</td>
-                  <td className="p-1.5 border border-slate-300 font-mono font-bold text-blue-900 bg-blue-50">{d.presionAlcanzadaPsi}</td>
+                  <td
+                    className="p-1.5 border border-slate-300 font-mono font-bold"
+                    style={{ color: colorSecundario, backgroundColor: `${colorSecundario}10` }}
+                  >
+                    {d.presionAlcanzadaPsi}
+                  </td>
                   <td className="p-1.5 border border-slate-300 font-bold">PSI</td>
                 </tr>
                 <tr>
                   <td className="p-1.5 border border-slate-300 text-left font-medium">Tiempo de Sostenimiento</td>
                   <td className="p-1.5 border border-slate-300 font-mono">-</td>
                   <td className="p-1.5 border border-slate-300 font-mono">≥ 30 min</td>
-                  <td className="p-1.5 border border-slate-300 font-mono font-bold text-blue-900 bg-blue-50">{d.tiempoSostenimientoMinutos}</td>
+                  <td
+                    className="p-1.5 border border-slate-300 font-mono font-bold"
+                    style={{ color: colorSecundario, backgroundColor: `${colorSecundario}10` }}
+                  >
+                    {d.tiempoSostenimientoMinutos}
+                  </td>
                   <td className="p-1.5 border border-slate-300 font-bold">Minutos</td>
                 </tr>
                 <tr>
                   <td className="p-1.5 border border-slate-300 text-left font-medium">Caída de Presión Observada</td>
                   <td className="p-1.5 border border-slate-300 font-mono">-</td>
                   <td className="p-1.5 border border-slate-300 font-mono">Máx: {d.caidaPresionPermisiblePsi} PSI</td>
-                  <td className="p-1.5 border border-slate-300 font-mono font-bold text-emerald-800 bg-blue-50">{d.caidaPresionRegistradaPsi}</td>
+                  <td className="p-1.5 border border-slate-300 font-mono font-bold text-emerald-800 bg-emerald-50">{d.caidaPresionRegistradaPsi}</td>
                   <td className="p-1.5 border border-slate-300 font-bold">PSI</td>
                 </tr>
                 <tr>
                   <td className="p-1.5 border border-slate-300 text-left font-medium">Temperatura del Fluido</td>
                   <td className="p-1.5 border border-slate-300 font-mono">-</td>
                   <td className="p-1.5 border border-slate-300 font-mono">-</td>
-                  <td className="p-1.5 border border-slate-300 font-mono font-bold text-blue-900 bg-blue-50">{d.temperaturaFluido}</td>
+                  <td
+                    className="p-1.5 border border-slate-300 font-mono font-bold"
+                    style={{ color: colorSecundario, backgroundColor: `${colorSecundario}10` }}
+                  >
+                    {d.temperaturaFluido}
+                  </td>
                   <td className="p-1.5 border border-slate-300 font-bold">°C</td>
                 </tr>
               </tbody>
@@ -248,20 +323,25 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
 
         {/* PÁGINA 2: TRAZABILIDAD, GRÁFICO DE PRESIÓN Y FIRMAS */}
         <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0">
-          <div className="flex justify-between items-center border-b border-slate-300 pb-2 mb-4 text-[10px] text-slate-600">
-            <span><strong>REPORTE:</strong> {numVisible} - {reporte.tituloReporteEs}</span>
+          <div
+            className="flex justify-between items-center border-b-2 pb-2 mb-4 text-[10px] text-slate-600"
+            style={{ borderColor: colorSecundario }}
+          >
+            <span><strong style={{ color: colorSecundario }}>REPORTE:</strong> {numVisible} - {reporte.tituloReporteEs}</span>
             <span>TAG: {d.tagSpoolLinea}</span>
             <span>Página 2 de 2</span>
           </div>
 
           {/* Gráfico de Presión vs Tiempo */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               4. Gráfica de Presión y Temperatura Durante el Sostenimiento
             </div>
             <div className="border border-slate-300 p-3 bg-white text-center">
               <svg viewBox="0 0 600 200" className="w-full h-44 bg-slate-50 border border-slate-200">
-                {/* Ejes */}
                 <line x1="40" y1="20" x2="580" y2="20" stroke="#e2e8f0" strokeDasharray="3" />
                 <line x1="40" y1="70" x2="580" y2="70" stroke="#e2e8f0" strokeDasharray="3" />
                 <line x1="40" y1="120" x2="580" y2="120" stroke="#e2e8f0" strokeDasharray="3" />
@@ -274,19 +354,17 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
                 <text x="35" y="174" fontSize="9" textAnchor="end" fill="#64748b">0 psi</text>
                 <text x="310" y="190" fontSize="9" textAnchor="middle" fill="#64748b">Tiempo de Prueba: 60 minutos (Sostenimiento Estable)</text>
 
-                {/* Línea objetivo de prueba */}
                 <line x1="40" y1="70" x2="580" y2="70" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4" />
                 <text x="540" y="65" fontSize="8" fill="#ef4444" fontWeight="bold">Presión: 450 psi</text>
 
-                {/* Curva de presurización, sostenimiento y despresurización */}
                 <path
                   d="M 40,170 L 100,70 L 480,70 L 540,170"
                   fill="none"
-                  stroke="#2563eb"
+                  stroke={colorSecundario}
                   strokeWidth="2.5"
                 />
-                <circle cx="290" cy="70" r="4" fill="#1e40af" />
-                <text x="290" y="60" fontSize="9" fill="#1e40af" fontWeight="bold" textAnchor="middle">
+                <circle cx="290" cy="70" r="4" fill={colorSecundario} />
+                <text x="290" y="60" fontSize="9" fill={colorSecundario} fontWeight="bold" textAnchor="middle">
                   452.5 PSI sostenido sin caída (0 PSI)
                 </text>
               </svg>
@@ -295,7 +373,10 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
 
           {/* Trazabilidad de Patrones */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               5. Trazabilidad de Instrumentos de Medición Patrón
             </div>
             <table className="w-full text-[10px] border-collapse border border-slate-300">
@@ -336,7 +417,10 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
 
           {/* Cuadro de 3 Firmas */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               6. Firmas y Autorizaciones
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -418,7 +502,12 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
             </div>
             <div className="text-right shrink-0">
               <span className="font-mono text-[9px] text-slate-400 block">PÁGINA 2 DE 2</span>
-              <span className="font-mono font-bold text-[10px] text-blue-900 block">{numVisible}</span>
+              <span
+                className="font-mono font-bold text-[10px] block"
+                style={{ color: colorSecundario }}
+              >
+                {numVisible}
+              </span>
             </div>
           </div>
         </div>

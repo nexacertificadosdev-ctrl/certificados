@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import type { ReporteCertificado } from '../../types';
-import { Printer, ArrowLeft, CheckCircle2, ShieldCheck, Compass } from 'lucide-react';
+import { Printer, ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { generarQrVerificacion, generarHashIntegridad } from '../../utils/security';
+import {
+  DEFAULT_LOGO_IZQUIERDO,
+  DEFAULT_LOGO_DERECHO,
+  DEFAULT_COLOR_PRIMARIO,
+  DEFAULT_COLOR_SECUNDARIO,
+  DEFAULT_COLOR_TEXTO,
+} from '../../utils/themeDefaults';
 
 interface CalibracionPdfPreviewProps {
   reporte: ReporteCertificado;
@@ -12,6 +19,12 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
   const d = reporte.datosCalibracion;
   const numVisible = reporte.numeroConsecutivo || reporte.tempId;
   const esOficial = !!reporte.numeroConsecutivo;
+
+  const colorPrimario = reporte.colorPrimario || DEFAULT_COLOR_PRIMARIO;
+  const colorSecundario = reporte.colorSecundario || DEFAULT_COLOR_SECUNDARIO;
+  const colorTexto = reporte.colorTextoEncabezado || DEFAULT_COLOR_TEXTO;
+  const logoIzquierdo = reporte.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO;
+  const logoDerecho = reporte.logoDerechoUrl || DEFAULT_LOGO_DERECHO;
 
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [hashIntegridad, setHashIntegridad] = useState<string>('');
@@ -54,7 +67,7 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
           <span
             className={`px-2.5 py-1 text-xs font-semibold rounded-full uppercase ${
               reporte.estado === 'emitido'
-                ? 'bg-purple-100 text-purple-800 border border-purple-300 font-bold'
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold'
                 : 'bg-amber-100 text-amber-800 border border-amber-300'
             }`}
           >
@@ -63,7 +76,7 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
 
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition cursor-pointer"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             <span>Imprimir / Guardar PDF</span>
@@ -75,18 +88,33 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
       <div className="max-w-[850px] mx-auto space-y-8 print:space-y-0 print:w-full">
         {/* PÁGINA 1: DATOS DEL INSTRUMENTO Y PATRONES */}
         <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 page-break">
-          {/* Encabezado */}
-          <div className="border border-slate-400 p-3 mb-4">
-            <div className="grid grid-cols-12 items-center text-center">
-              <div className="col-span-3 border-r border-slate-300 pr-2">
-                <div className="bg-blue-900 text-white py-2 px-3 rounded font-bold text-base tracking-widest flex items-center justify-center gap-1">
-                  <Compass className="w-5 h-5 text-amber-400" />
-                  <span>LABMET</span>
-                </div>
-                <span className="text-[9px] text-slate-500 block mt-1">Laboratorio de Calibración Acreditado</span>
+          {/* Encabezado con Doble Logo y Color Secundario */}
+          <div
+            className="border-2 p-3 mb-4 rounded-xs"
+            style={{ borderColor: colorSecundario }}
+          >
+            <div className="grid grid-cols-12 items-center text-center gap-2">
+              {/* Logo Izquierdo */}
+              <div className="col-span-3 border-r border-slate-300 pr-2 flex items-center justify-center">
+                {logoIzquierdo ? (
+                  <img
+                    src={logoIzquierdo}
+                    alt="Logo Izquierdo"
+                    className="h-16 max-w-full object-contain"
+                  />
+                ) : (
+                  <div className="bg-slate-900 text-white py-2 px-3 rounded font-bold text-sm tracking-widest">
+                    EMPRESA
+                  </div>
+                )}
               </div>
-              <div className="col-span-6 px-2">
-                <h1 className="text-sm font-bold text-slate-900 uppercase tracking-tight">
+
+              {/* Títulos Centrales */}
+              <div className="col-span-6 px-1">
+                <h1
+                  className="text-sm font-black uppercase tracking-tight"
+                  style={{ color: colorSecundario }}
+                >
                   {reporte.tituloReporteEs || 'CERTIFICADO DE CALIBRACION'}
                 </h1>
                 {reporte.tituloReporteEn && (
@@ -94,14 +122,31 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
                     {reporte.tituloReporteEn}
                   </span>
                 )}
-                <span className="text-[10px] text-slate-600 font-medium block mt-0.5">
+                <span
+                  className="text-[10px] font-semibold block mt-0.5"
+                  style={{ color: colorSecundario }}
+                >
                   Magnitud: {d.magnitud} | {reporte.subtituloNormativo || d.normaMetodo}
                 </span>
               </div>
-              <div className="col-span-3 border-l border-slate-300 pl-2 text-right">
+
+              {/* Logo Derecho */}
+              <div className="col-span-3 border-l border-slate-300 pl-2 flex flex-col items-center justify-center">
+                {logoDerecho ? (
+                  <img
+                    src={logoDerecho}
+                    alt="Logo Derecho"
+                    className="h-12 max-w-full object-contain mb-1"
+                  />
+                ) : null}
                 <span className="text-[8px] text-slate-500 block uppercase">Certificado No.</span>
-                <span className="font-mono font-bold text-sm text-purple-900 block">{numVisible}</span>
-                <span className="text-[9px] text-slate-400 block mt-0.5">Página 1 de 2</span>
+                <span
+                  className="font-mono font-bold text-xs block"
+                  style={{ color: colorSecundario }}
+                >
+                  {numVisible}
+                </span>
+                <span className="text-[8px] text-slate-400 block">Página 1 de 2</span>
               </div>
             </div>
           </div>
@@ -114,7 +159,10 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
 
           {/* Sección 1: Datos del Solicitante */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               1. Datos del Solicitante
             </div>
             <table className="w-full text-[11px] border-collapse border border-slate-300">
@@ -141,7 +189,10 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
 
           {/* Sección 2: Datos del Instrumento */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               2. Identificación del Instrumento Calibrado
             </div>
             <table className="w-full text-[11px] border-collapse border border-slate-300">
@@ -150,7 +201,12 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
                   <td className="bg-slate-100 font-bold p-1.5 border border-slate-300 w-1/4">Instrumento:</td>
                   <td className="p-1.5 border border-slate-300 w-1/4 font-medium">{d.tipoInstrumento}</td>
                   <td className="bg-slate-100 font-bold p-1.5 border border-slate-300 w-1/4">Identificación (Tag):</td>
-                  <td className="p-1.5 border border-slate-300 w-1/4 font-mono font-bold text-blue-900">{d.tagIdentificacion}</td>
+                  <td
+                    className="p-1.5 border border-slate-300 w-1/4 font-mono font-bold"
+                    style={{ color: colorSecundario }}
+                  >
+                    {d.tagIdentificacion}
+                  </td>
                 </tr>
                 <tr>
                   <td className="bg-slate-100 font-bold p-1.5 border border-slate-300">Fabricante:</td>
@@ -176,7 +232,10 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
 
           {/* Sección 3: Patrones y Condiciones Ambientales */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-1"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               3. Condiciones Ambientales y Trazabilidad Metrológica
             </div>
 
@@ -225,42 +284,58 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
 
         {/* PÁGINA 2: RESULTADOS METROLÓGICOS, INCERTIDUMBRE Y FIRMAS */}
         <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0">
-          <div className="flex justify-between items-center border-b border-slate-300 pb-2 mb-4 text-[10px] text-slate-600">
-            <span><strong>CERTIFICADO:</strong> {numVisible} - {reporte.tituloReporteEs}</span>
+          <div
+            className="flex justify-between items-center border-b-2 pb-2 mb-4 text-[10px] text-slate-600"
+            style={{ borderColor: colorSecundario }}
+          >
+            <span><strong style={{ color: colorSecundario }}>CERTIFICADO:</strong> {numVisible} - {reporte.tituloReporteEs}</span>
             <span>TAG: {d.tagIdentificacion} | SERIAL: {d.numeroSerie}</span>
             <span>Página 2 de 2</span>
           </div>
 
           {/* Tabla de Puntos de Calibración */}
           <div className="mb-4">
-            <div className="bg-slate-800 text-white px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2">
+            <div
+              className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2"
+              style={{ backgroundColor: colorPrimario, color: colorTexto }}
+            >
               4. Resultados de Medición y Curva de Calibración ({d.unidadMedida})
             </div>
 
             <table className="w-full text-[10px] border-collapse border border-slate-300 text-center mb-3">
               <thead>
-                <tr className="bg-slate-100">
+                <tr style={{ backgroundColor: colorPrimario, color: colorTexto }}>
                   <th className="p-1.5 border border-slate-300">Valor Nominal</th>
-                  <th className="p-1.5 border border-slate-300 bg-blue-50 font-bold">Valor Patrón</th>
+                  <th className="p-1.5 border border-slate-300 font-bold">Valor Patrón</th>
                   <th className="p-1.5 border border-slate-300">Lectura Subida</th>
                   <th className="p-1.5 border border-slate-300">Lectura Bajada</th>
-                  <th className="p-1.5 border border-slate-300 text-rose-700">Error Subida</th>
-                  <th className="p-1.5 border border-slate-300 text-rose-700">Error Bajada</th>
+                  <th className="p-1.5 border border-slate-300">Error Subida</th>
+                  <th className="p-1.5 border border-slate-300">Error Bajada</th>
                   <th className="p-1.5 border border-slate-300">Histéresis</th>
-                  <th className="p-1.5 border border-slate-300 font-bold bg-purple-50">Incertidumbre U(k=2)</th>
+                  <th className="p-1.5 border border-slate-300 font-bold">Incertidumbre U(k=2)</th>
                 </tr>
               </thead>
               <tbody>
                 {d.puntos.map((pt) => (
                   <tr key={pt.id} className="hover:bg-slate-50">
                     <td className="p-1.5 border border-slate-300 font-mono">{pt.nominal.toFixed(1)}</td>
-                    <td className="p-1.5 border border-slate-300 font-mono font-bold bg-blue-50/50">{pt.patron.toFixed(2)}</td>
+                    <td
+                      className="p-1.5 border border-slate-300 font-mono font-bold"
+                      style={{ color: colorSecundario, backgroundColor: `${colorSecundario}10` }}
+                    >
+                      {pt.patron.toFixed(2)}
+                    </td>
                     <td className="p-1.5 border border-slate-300 font-mono">{pt.lecturaSubida.toFixed(2)}</td>
                     <td className="p-1.5 border border-slate-300 font-mono">{pt.lecturaBajada.toFixed(2)}</td>
                     <td className="p-1.5 border border-slate-300 font-mono text-rose-700 font-semibold">{pt.errorSubida > 0 ? `+${pt.errorSubida.toFixed(2)}` : pt.errorSubida.toFixed(2)}</td>
                     <td className="p-1.5 border border-slate-300 font-mono text-rose-700 font-semibold">{pt.errorBajada > 0 ? `+${pt.errorBajada.toFixed(2)}` : pt.errorBajada.toFixed(2)}</td>
                     <td className="p-1.5 border border-slate-300 font-mono">{pt.histeresis.toFixed(2)}</td>
-                    <td className="p-1.5 border border-slate-300 font-mono font-bold bg-purple-50/50">±{pt.incertidumbreExpandida.toFixed(2)}</td>
+                    <td
+                      className="p-1.5 border border-slate-300 font-mono font-bold"
+                      style={{ color: colorSecundario, backgroundColor: `${colorSecundario}10` }}
+                    >
+                      ±{pt.incertidumbreExpandida.toFixed(2)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -274,7 +349,12 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
               </div>
               <div className="border border-slate-300 p-2 text-center bg-slate-50 rounded">
                 <span className="text-[10px] text-slate-500 block">Incertidumbre Expandida Máx (k=2)</span>
-                <span className="text-xs font-mono font-bold text-purple-900">±{d.incertidumbreGlobal.toFixed(2)} {d.unidadMedida}</span>
+                <span
+                  className="text-xs font-mono font-bold"
+                  style={{ color: colorSecundario }}
+                >
+                  ±{d.incertidumbreGlobal.toFixed(2)} {d.unidadMedida}
+                </span>
               </div>
               <div className="border border-slate-300 p-2 text-center bg-slate-50 rounded flex flex-col justify-center">
                 <span className="text-[10px] text-slate-500 block">Evaluación de Tolerancia</span>
@@ -313,14 +393,14 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
                 <path
                   d="M 50,70 L 160,65 L 280,58 L 400,62 L 500,55"
                   fill="none"
-                  stroke="#2563eb"
+                  stroke={colorSecundario}
                   strokeWidth="2"
                 />
-                <circle cx="50" cy="70" r="3" fill="#2563eb" />
-                <circle cx="160" cy="65" r="3" fill="#2563eb" />
-                <circle cx="280" cy="58" r="3" fill="#2563eb" />
-                <circle cx="400" cy="62" r="3" fill="#2563eb" />
-                <circle cx="500" cy="55" r="3" fill="#2563eb" />
+                <circle cx="50" cy="70" r="3" fill={colorSecundario} />
+                <circle cx="160" cy="65" r="3" fill={colorSecundario} />
+                <circle cx="280" cy="58" r="3" fill={colorSecundario} />
+                <circle cx="400" cy="62" r="3" fill={colorSecundario} />
+                <circle cx="500" cy="55" r="3" fill={colorSecundario} />
               </svg>
             </div>
           </div>
@@ -397,7 +477,12 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
             </div>
             <div className="text-right shrink-0">
               <span className="font-mono text-[9px] text-slate-400 block">PÁGINA 2 DE 2</span>
-              <span className="font-mono font-bold text-[10px] text-blue-900 block">{numVisible}</span>
+              <span
+                className="font-mono font-bold text-[10px] block"
+                style={{ color: colorSecundario }}
+              >
+                {numVisible}
+              </span>
             </div>
           </div>
         </div>
