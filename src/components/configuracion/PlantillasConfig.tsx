@@ -24,6 +24,7 @@ import {
   Image as ImageIcon,
   Palette,
   RotateCcw,
+  Layers,
 } from 'lucide-react';
 
 interface PlantillasConfigProps {
@@ -37,6 +38,8 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
   const [plantillaEnEdicion, setPlantillaEnEdicion] = useState<PlantillaDocumental | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
   const [previewPlantilla, setPreviewPlantilla] = useState<PlantillaDocumental | null>(null);
+  const [replicarLogosATodas, setReplicarLogosATodas] = useState<boolean>(true);
+  const [replicarColoresATodas, setReplicarColoresATodas] = useState<boolean>(true);
 
   const puedeEditar = ['administrador', 'director_tecnico'].includes(usuarioActual.rol);
 
@@ -130,6 +133,27 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
     reader.readAsDataURL(file);
   };
 
+  const handleCopiarLogosATodasAhora = () => {
+    if (!plantillaEnEdicion) return;
+
+    storageService.aplicarLogosYColoresATodasLasPlantillas(
+      {
+        logoIzquierdoUrl: plantillaEnEdicion.logoIzquierdoUrl,
+        logoDerechoUrl: plantillaEnEdicion.logoDerechoUrl,
+        colorPrimario: plantillaEnEdicion.colorPrimario,
+        colorSecundario: plantillaEnEdicion.colorSecundario,
+        colorTextoEncabezado: plantillaEnEdicion.colorTextoEncabezado,
+        incluirColores: replicarColoresATodas,
+      },
+      usuarioActual
+    );
+    recargar();
+    setMensajeExito(
+      `¡Logotipos ${replicarColoresATodas ? 'y colores ' : ''}copiados inmediatamente a todas las ${plantillas.length} plantillas del sistema (Válvulas, Tubería, Presión, Temperatura, Eléctricas)!`
+    );
+    setTimeout(() => setMensajeExito(null), 4000);
+  };
+
   const handleGuardarModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!plantillaEnEdicion) return;
@@ -139,12 +163,30 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
       return;
     }
 
+    if (replicarLogosATodas) {
+      storageService.aplicarLogosYColoresATodasLasPlantillas(
+        {
+          logoIzquierdoUrl: plantillaEnEdicion.logoIzquierdoUrl,
+          logoDerechoUrl: plantillaEnEdicion.logoDerechoUrl,
+          colorPrimario: plantillaEnEdicion.colorPrimario,
+          colorSecundario: plantillaEnEdicion.colorSecundario,
+          colorTextoEncabezado: plantillaEnEdicion.colorTextoEncabezado,
+          incluirColores: replicarColoresATodas,
+        },
+        usuarioActual
+      );
+    }
+
     storageService.guardarPlantilla(plantillaEnEdicion, usuarioActual);
     recargar();
     setModalAbierto(false);
     setPlantillaEnEdicion(null);
-    setMensajeExito('Plantilla documental y diseño visual guardados exitosamente.');
-    setTimeout(() => setMensajeExito(null), 3000);
+    setMensajeExito(
+      replicarLogosATodas
+        ? `Plantilla guardada y logotipos ${replicarColoresATodas ? 'y colores ' : ''}copiados a todas las plantillas del sistema.`
+        : 'Plantilla documental y diseño visual guardados exitosamente.'
+    );
+    setTimeout(() => setMensajeExito(null), 4000);
   };
 
   return (
@@ -562,6 +604,37 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
                     </div>
                   </div>
                 </div>
+
+                {/* Banner de Replicación de Logos a Todos los Grupos */}
+                <div className="bg-emerald-50/90 border border-emerald-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="replicarLogos"
+                      checked={replicarLogosATodas}
+                      onChange={(e) => setReplicarLogosATodas(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <div>
+                      <label htmlFor="replicarLogos" className="font-bold text-emerald-950 text-xs cursor-pointer block">
+                        Copiar estos logotipos a todos los demás grupos de plantillas
+                      </label>
+                      <p className="text-[11px] text-emerald-800 mt-0.5">
+                        Al guardar, se actualizarán automáticamente en Válvulas de Seguridad, Control, On/Off, Manuales, Tubería, Presión, Temperatura y Eléctricas ({plantillas.length} plantillas configuradas).
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopiarLogosATodasAhora}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition shrink-0 cursor-pointer"
+                    title="Copiar logotipos inmediatamente a todas las plantillas"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Copiar a todas ahora</span>
+                  </button>
+                </div>
               </div>
 
               {/* Sección 2: Paleta de Colores del Certificado */}
@@ -736,6 +809,25 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
                       Color de la letra sobre fondo de tabla
                     </span>
                   </div>
+                </div>
+
+                {/* Opción para replicar también la paleta de colores */}
+                <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="replicarColores"
+                      checked={replicarColoresATodas}
+                      onChange={(e) => setReplicarColoresATodas(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <label htmlFor="replicarColores" className="text-xs font-semibold text-slate-800 cursor-pointer">
+                      Copiar también esta paleta de colores (tablas y títulos) a todas las demás plantillas
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                    Tablas: {plantillaEnEdicion.colorPrimario} | Títulos: {plantillaEnEdicion.colorSecundario}
+                  </span>
                 </div>
               </div>
 

@@ -290,6 +290,49 @@ class StorageService {
     }
   }
 
+  public aplicarLogosYColoresATodasLasPlantillas(
+    opciones: {
+      logoIzquierdoUrl?: string;
+      logoDerechoUrl?: string;
+      colorPrimario?: string;
+      colorSecundario?: string;
+      colorTextoEncabezado?: string;
+      incluirColores?: boolean;
+    },
+    usuario?: Usuario
+  ): void {
+    const plantillas = this.getPlantillas();
+    const actualizadas = plantillas.map((p) => ({
+      ...p,
+      logoIzquierdoUrl: opciones.logoIzquierdoUrl ?? p.logoIzquierdoUrl,
+      logoDerechoUrl: opciones.logoDerechoUrl ?? p.logoDerechoUrl,
+      ...(opciones.incluirColores
+        ? {
+            colorPrimario: opciones.colorPrimario ?? p.colorPrimario,
+            colorSecundario: opciones.colorSecundario ?? p.colorSecundario,
+            colorTextoEncabezado: opciones.colorTextoEncabezado ?? p.colorTextoEncabezado,
+          }
+        : {}),
+    }));
+
+    this.set(STORAGE_KEYS.PLANTILLAS, actualizadas);
+    actualizadas.forEach((p) => {
+      supabaseService.guardarPlantillaEnNube(p).catch(() => {});
+    });
+
+    if (usuario) {
+      this.registrarAuditoria({
+        usuarioId: usuario.id,
+        usuarioNombre: usuario.nombre,
+        rol: usuario.rol,
+        accion: 'CONFIGURACION',
+        entidad: 'plantilla',
+        entidadId: 'todas',
+        detalles: `Replicación masiva de logotipos ${opciones.incluirColores ? 'y paleta de colores ' : ''}a todas las ${actualizadas.length} plantillas del sistema.`,
+      });
+    }
+  }
+
   public eliminarPlantilla(id: string, usuario?: Usuario): void {
     const plantillas = this.getPlantillas();
     const target = plantillas.find(p => p.id === id);
