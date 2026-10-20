@@ -8,12 +8,40 @@
 
 /* Reglas de impresión para certificados PDF */
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  @page {
+    size: letter portrait;
+    margin: 8mm 10mm 8mm 10mm;
   }
 
-  .no-print {
+  /* Resetear todos los contenedores para flujo ilimitado de impresión */
+  html,
+  body,
+  #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Desactivar recorte de overflow en todos los elementos durante la impresión */
+  body * {
+    overflow: visible !important;
+  }
+
+  /* Ocultar elementos de navegación, modales y barras de herramientas */
+  .no-print,
+  aside,
+  header,
+  nav,
+  button,
+  .no-print-area {
     display: none !important;
   }
 
@@ -21,8 +49,22 @@
     display: block !important;
   }
 
+  /* Salto de página estricto e infalible */
   .page-break {
-    page-break-after: always;
-    break-after: page;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Evitar que tablas y firmas se rompan de forma antiestética entre dos páginas */
+  table,
+  tr,
+  img,
+  svg {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

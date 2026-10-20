@@ -119,7 +119,7 @@ export function App() {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#f8fafc] flex overflow-hidden font-sans">
+    <div className="h-screen w-screen bg-[#f8fafc] flex overflow-hidden font-sans print:h-auto print:w-auto print:overflow-visible print:bg-white print:block">
       {/* 1. Menú Lateral Izquierdo (Sidebar) */}
       <Sidebar
         vistaActual={vistaActual}
@@ -138,7 +138,7 @@ export function App() {
       />
 
       {/* 2. Área Principal de Contenido con Header Superior */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden print:h-auto print:w-full print:overflow-visible print:block">
         <TopHeader
           usuarioActual={usuarioActual}
           onNuevoReporte={handleNuevoReporte}
@@ -146,7 +146,7 @@ export function App() {
           patronesVencidos={patronesVencidos}
         />
 
-        <main className="flex-1 overflow-y-auto pb-16">
+        <main className="flex-1 overflow-y-auto pb-16 print:h-auto print:overflow-visible print:p-0 print:m-0 print:block">
           {vistaActual === 'dashboard' && (
             <DashboardView
               reportes={reportes}

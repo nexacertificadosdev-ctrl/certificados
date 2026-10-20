@@ -35,7 +35,13 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
   }, [reporte]);
 
   const handlePrint = () => {
+    const tituloOriginal = document.title;
+    const nombreArchivo = `${reporte.numeroConsecutivo || 'REPORTE'}_${reporte.clienteNombre || 'CLIENTE'}`.replace(/[\/\\?%*:|"<> ]/g, '_');
+    document.title = nombreArchivo;
     window.print();
+    setTimeout(() => {
+      document.title = tituloOriginal;
+    }, 1000);
   };
 
   if (!d) {
@@ -55,7 +61,7 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
   const desviacionPct = (((d.disparoAjustadoPsi - setPoint) / setPoint) * 100).toFixed(2);
 
   return (
-    <div className="bg-slate-200 min-h-screen py-8 px-4 sm:px-6">
+    <div className="bg-slate-200 min-h-screen py-8 px-4 sm:px-6 print:bg-white print:p-0 print:m-0 print:min-h-0 print:block">
       {/* Barra de control flotante no imprimible */}
       <div className="max-w-4xl mx-auto mb-6 flex items-center justify-between bg-white p-4 rounded-xl shadow-md border border-slate-300 no-print">
         <button
@@ -95,11 +101,11 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
       </div>
 
       {/* CONTENEDOR DOCUMENTO (3 PÁGINAS CARTA) */}
-      <div className="max-w-[850px] mx-auto space-y-8 print:space-y-0 print:w-full">
+      <div className="max-w-[850px] mx-auto space-y-8 print:space-y-0 print:w-full print:max-w-none print:block">
         {/* ========================================================= */}
         {/* PÁGINA 1: DATOS GENERALES, AMBIENTALES Y TRAZABILIDAD */}
         {/* ========================================================= */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 page-break">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0 page-break">
           {/* Encabezado Institucional con Doble Logo y Colores */}
           <div
             className="border-2 p-3 mb-4 rounded-xs"
@@ -365,7 +371,7 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
         {/* ========================================================= */}
         {/* PÁGINA 2: RESULTADOS TÉCNICOS, CRITERIOS Y GRÁFICAS */}
         {/* ========================================================= */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 page-break">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0 page-break">
           {/* Subencabezado Página 2 */}
           <div
             className="flex justify-between items-center border-b-2 pb-2 mb-4 text-[10px] text-slate-600"
@@ -564,7 +570,7 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
         {/* ========================================================= */}
         {/* PÁGINA 3: OBSERVACIONES, DECLARACIONES Y FIRMAS */}
         {/* ========================================================= */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0">
           {/* Subencabezado Página 3 */}
           <div
             className="flex justify-between items-center border-b-2 pb-2 mb-4 text-[10px] text-slate-600"
