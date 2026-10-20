@@ -9,6 +9,7 @@ import {
   DEFAULT_COLOR_TEXTO,
   PALETAS_PREDEFINIDAS,
 } from '../../utils/themeDefaults';
+import { optimizarImagenParaLogo } from '../../utils/imageOptimizer';
 import {
   FileText,
   Plus,
@@ -25,6 +26,7 @@ import {
   Palette,
   RotateCcw,
   Layers,
+  RefreshCw,
 } from 'lucide-react';
 
 interface PlantillasConfigProps {
@@ -78,13 +80,14 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
   };
 
   const handleEditar = (p: PlantillaDocumental) => {
+    const globalCfg = storageService.getConfiguracionGlobal();
     setPlantillaEnEdicion({
       ...p,
-      logoIzquierdoUrl: p.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO,
-      logoDerechoUrl: p.logoDerechoUrl || DEFAULT_LOGO_DERECHO,
-      colorPrimario: p.colorPrimario || DEFAULT_COLOR_PRIMARIO,
-      colorSecundario: p.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
-      colorTextoEncabezado: p.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
+      logoIzquierdoUrl: p.logoIzquierdoUrl || globalCfg.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO,
+      logoDerechoUrl: p.logoDerechoUrl || globalCfg.logoDerechoUrl || DEFAULT_LOGO_DERECHO,
+      colorPrimario: p.colorPrimario || globalCfg.colorPrimario || DEFAULT_COLOR_PRIMARIO,
+      colorSecundario: p.colorSecundario || globalCfg.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
+      colorTextoEncabezado: p.colorTextoEncabezado || globalCfg.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
     });
     setModalAbierto(true);
   };
@@ -111,26 +114,37 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, lado: 'izquierdo' | 'derecho') => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, lado: 'izquierdo' | 'derecho') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert('La imagen no debe superar los 2MB.');
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen no debe superar los 5MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
+    try {
+      const optimizedBase64 = await optimizarImagenParaLogo(file, 400);
       if (plantillaEnEdicion) {
         setPlantillaEnEdicion({
           ...plantillaEnEdicion,
-          [lado === 'izquierdo' ? 'logoIzquierdoUrl' : 'logoDerechoUrl']: base64,
+          [lado === 'izquierdo' ? 'logoIzquierdoUrl' : 'logoDerechoUrl']: optimizedBase64,
         });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error optimizando imagen de logo:', err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        if (plantillaEnEdicion) {
+          setPlantillaEnEdicion({
+            ...plantillaEnEdicion,
+            [lado === 'izquierdo' ? 'logoIzquierdoUrl' : 'logoDerechoUrl']: base64,
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleCopiarLogosATodasAhora = () => {
@@ -154,6 +168,39 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
     setTimeout(() => setMensajeExito(null), 4000);
   };
 
+  const handleSincronizarATodas = () => {
+    const globalCfg = storageService.getConfiguracionGlobal();
+    // Buscar la plantilla que tenga logos personalizados cargados, o usar globalCfg
+    const plantillaReferencia = plantillas.find(
+      (p) =>
+        (p.logoIzquierdoUrl && p.logoIzquierdoUrl !== DEFAULT_LOGO_IZQUIERDO) ||
+        (p.logoDerechoUrl && p.logoDerechoUrl !== DEFAULT_LOGO_DERECHO)
+    ) || plantillas[0];
+
+    const logoIzq = plantillaReferencia?.logoIzquierdoUrl || globalCfg.logoIzquierdoUrl;
+    const logoDer = plantillaReferencia?.logoDerechoUrl || globalCfg.logoDerechoUrl;
+    const colPri = plantillaReferencia?.colorPrimario || globalCfg.colorPrimario;
+    const colSec = plantillaReferencia?.colorSecundario || globalCfg.colorSecundario;
+    const colTxt = plantillaReferencia?.colorTextoEncabezado || globalCfg.colorTextoEncabezado;
+
+    storageService.aplicarLogosYColoresATodasLasPlantillas(
+      {
+        logoIzquierdoUrl: logoIzq,
+        logoDerechoUrl: logoDer,
+        colorPrimario: colPri,
+        colorSecundario: colSec,
+        colorTextoEncabezado: colTxt,
+        incluirColores: true,
+      },
+      usuarioActual
+    );
+    recargar();
+    setMensajeExito(
+      `¡Logotipos y colores sincronizados con éxito en todas las ${plantillas.length} plantillas del sistema!`
+    );
+    setTimeout(() => setMensajeExito(null), 4000);
+  };
+
   const handleGuardarModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!plantillaEnEdicion) return;
@@ -164,6 +211,10 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
     }
 
     if (replicarLogosATodas) {
+      // 1. Guardar primero la plantilla en edición para asegurar sus títulos, normas y códigos
+      storageService.guardarPlantilla(plantillaEnEdicion, usuarioActual);
+
+      // 2. Replicar los logos y colores de esta plantilla a todas las demás
       storageService.aplicarLogosYColoresATodasLasPlantillas(
         {
           logoIzquierdoUrl: plantillaEnEdicion.logoIzquierdoUrl,
@@ -175,15 +226,16 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
         },
         usuarioActual
       );
+    } else {
+      storageService.guardarPlantilla(plantillaEnEdicion, usuarioActual);
     }
 
-    storageService.guardarPlantilla(plantillaEnEdicion, usuarioActual);
     recargar();
     setModalAbierto(false);
     setPlantillaEnEdicion(null);
     setMensajeExito(
       replicarLogosATodas
-        ? `Plantilla guardada y logotipos ${replicarColoresATodas ? 'y colores ' : ''}copiados a todas las plantillas del sistema.`
+        ? `¡Plantilla guardada y logotipos ${replicarColoresATodas ? 'y colores ' : ''}copiados a todas las ${plantillas.length} plantillas del sistema!`
         : 'Plantilla documental y diseño visual guardados exitosamente.'
     );
     setTimeout(() => setMensajeExito(null), 4000);
@@ -204,13 +256,24 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
         </div>
 
         {puedeEditar && (
-          <button
-            onClick={handleNueva}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nueva Plantilla</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={handleSincronizarATodas}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition border border-slate-300 shadow-xs cursor-pointer"
+              title="Aplica los logotipos y colores configurados a todas las plantillas del catálogo"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Sincronizar Logos a Todas</span>
+            </button>
+            <button
+              onClick={handleNueva}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nueva Plantilla</span>
+            </button>
+          </div>
         )}
       </div>
 

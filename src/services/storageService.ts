@@ -37,6 +37,7 @@ const STORAGE_KEYS = {
   EQUIPOS: 'cert_equipos_v1',
   PATRONES: 'cert_patrones_v1',
   PLANTILLAS: 'cert_plantillas_v1',
+  CONFIG_GLOBAL: 'cert_config_global_v1',
   AUDITORIA: 'cert_auditoria_v1',
   USUARIO_ACTUAL: 'cert_usuario_actual_v1',
 };
@@ -55,12 +56,36 @@ class StorageService {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-      console.error('Error guardando en localStorage:', e);
+      console.warn(`[storageService] Exceso de cuota o error al guardar '${key}':`, e);
+      if (key === STORAGE_KEYS.PLANTILLAS && Array.isArray(value)) {
+        try {
+          // Si el array de 12 plantillas excede la cuota de 5MB por duplicación de base64,
+          // guardamos una versión optimizada donde las plantillas heredan de CONFIG_GLOBAL.
+          const plantillasLigeras = (value as PlantillaDocumental[]).map((p) => ({
+            ...p,
+            logoIzquierdoUrl: p.logoIzquierdoUrl?.startsWith('data:') && p.logoIzquierdoUrl.length > 3000 ? '' : p.logoIzquierdoUrl,
+            logoDerechoUrl: p.logoDerechoUrl?.startsWith('data:') && p.logoDerechoUrl.length > 3000 ? '' : p.logoDerechoUrl,
+          }));
+          localStorage.setItem(key, JSON.stringify(plantillasLigeras));
+          console.info('[storageService] Plantillas guardadas en formato ligero con herencia de logos globales.');
+        } catch (err2) {
+          console.error('[storageService] Error persistente al guardar plantillas ligeras:', err2);
+        }
+      }
     }
   }
 
   // Inicialización de datos
   public init(): void {
+    if (!localStorage.getItem(STORAGE_KEYS.CONFIG_GLOBAL)) {
+      this.setConfiguracionGlobal({
+        logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
+        logoDerechoUrl: DEFAULT_LOGO_DERECHO,
+        colorPrimario: DEFAULT_COLOR_PRIMARIO,
+        colorSecundario: DEFAULT_COLOR_SECUNDARIO,
+        colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
+      });
+    }
     if (!localStorage.getItem(STORAGE_KEYS.SERIES)) {
       this.set(STORAGE_KEYS.SERIES, SERIES_INICIALES);
     }
@@ -248,17 +273,106 @@ class StorageService {
     supabaseService.guardarSerieEnNube(serie).catch(() => {});
   }
 
+  // Configuración global institucional de logos y colores
+  public getConfiguracionGlobal(): {
+    logoIzquierdoUrl: string;
+    logoDerechoUrl: string;
+    colorPrimario: string;
+    colorSecundario: string;
+    colorTextoEncabezado: string;
+  } {
+    const cfg = this.get(STORAGE_KEYS.CONFIG_GLOBAL, {
+      logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
+      logoDerechoUrl: DEFAULT_LOGO_DERECHO,
+      colorPrimario: DEFAULT_COLOR_PRIMARIO,
+      colorSecundario: DEFAULT_COLOR_SECUNDARIO,
+      colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
+    });
+
+    // Auto-recuperación: si la configuración global conserva los logos SVG por defecto,
+    // pero alguna plantilla ya fue personalizada con logotipos del usuario,
+    // adoptamos automáticamente esos logos como globales institucionales.
+    const esDefaultIzq = !cfg.logoIzquierdoUrl || cfg.logoIzquierdoUrl === DEFAULT_LOGO_IZQUIERDO;
+    const esDefaultDer = !cfg.logoDerechoUrl || cfg.logoDerechoUrl === DEFAULT_LOGO_DERECHO;
+
+    if (esDefaultIzq || esDefaultDer) {
+      try {
+        const rawPlantillas = this.get<PlantillaDocumental[]>(STORAGE_KEYS.PLANTILLAS, []);
+        const plantillaConLogo = rawPlantillas.find(
+          (p) =>
+            (p.logoIzquierdoUrl && p.logoIzquierdoUrl !== DEFAULT_LOGO_IZQUIERDO) ||
+            (p.logoDerechoUrl && p.logoDerechoUrl !== DEFAULT_LOGO_DERECHO)
+        );
+        if (plantillaConLogo) {
+          if (esDefaultIzq && plantillaConLogo.logoIzquierdoUrl && plantillaConLogo.logoIzquierdoUrl !== DEFAULT_LOGO_IZQUIERDO) {
+            cfg.logoIzquierdoUrl = plantillaConLogo.logoIzquierdoUrl;
+          }
+          if (esDefaultDer && plantillaConLogo.logoDerechoUrl && plantillaConLogo.logoDerechoUrl !== DEFAULT_LOGO_DERECHO) {
+            cfg.logoDerechoUrl = plantillaConLogo.logoDerechoUrl;
+          }
+          this.set(STORAGE_KEYS.CONFIG_GLOBAL, cfg);
+        }
+      } catch {
+        // Ignorar si hay error
+      }
+    }
+
+    return cfg;
+  }
+
+  public setConfiguracionGlobal(config: Partial<{
+    logoIzquierdoUrl: string;
+    logoDerechoUrl: string;
+    colorPrimario: string;
+    colorSecundario: string;
+    colorTextoEncabezado: string;
+  }>): void {
+    const actual = this.getConfiguracionGlobal();
+    this.set(STORAGE_KEYS.CONFIG_GLOBAL, { ...actual, ...config });
+  }
+
   // Plantillas documentales y configuración de títulos
   public getPlantillas(): PlantillaDocumental[] {
+    const globalCfg = this.getConfiguracionGlobal();
     const list = this.get<PlantillaDocumental[]>(STORAGE_KEYS.PLANTILLAS, PLANTILLAS_INICIALES);
-    return list.map((p) => ({
-      ...p,
-      logoIzquierdoUrl: p.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO,
-      logoDerechoUrl: p.logoDerechoUrl || DEFAULT_LOGO_DERECHO,
-      colorPrimario: p.colorPrimario || DEFAULT_COLOR_PRIMARIO,
-      colorSecundario: p.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
-      colorTextoEncabezado: p.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
-    }));
+
+    return list.map((p) => {
+      // Si la plantilla no tiene logo asignado o tiene el logo por defecto inicial,
+      // hereda el logo institucional configurado globalmente.
+      const usarGlobalIzq =
+        !p.logoIzquierdoUrl ||
+        p.logoIzquierdoUrl === DEFAULT_LOGO_IZQUIERDO;
+
+      const usarGlobalDer =
+        !p.logoDerechoUrl ||
+        p.logoDerechoUrl === DEFAULT_LOGO_DERECHO;
+
+      const usarGlobalPrimario =
+        !p.colorPrimario ||
+        p.colorPrimario === DEFAULT_COLOR_PRIMARIO;
+
+      const usarGlobalSecundario =
+        !p.colorSecundario ||
+        p.colorSecundario === DEFAULT_COLOR_SECUNDARIO;
+
+      return {
+        ...p,
+        logoIzquierdoUrl: usarGlobalIzq
+          ? (globalCfg.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO)
+          : (p.logoIzquierdoUrl || DEFAULT_LOGO_IZQUIERDO),
+        logoDerechoUrl: usarGlobalDer
+          ? (globalCfg.logoDerechoUrl || DEFAULT_LOGO_DERECHO)
+          : (p.logoDerechoUrl || DEFAULT_LOGO_DERECHO),
+        colorPrimario: usarGlobalPrimario
+          ? (globalCfg.colorPrimario || DEFAULT_COLOR_PRIMARIO)
+          : (p.colorPrimario || DEFAULT_COLOR_PRIMARIO),
+        colorSecundario: usarGlobalSecundario
+          ? (globalCfg.colorSecundario || DEFAULT_COLOR_SECUNDARIO)
+          : (p.colorSecundario || DEFAULT_COLOR_SECUNDARIO),
+        colorTextoEncabezado:
+          p.colorTextoEncabezado || globalCfg.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
+      };
+    });
   }
 
   public getPlantillasPorClasificacion(codigo: CodigoClasificacion): PlantillaDocumental[] {
@@ -301,16 +415,35 @@ class StorageService {
     },
     usuario?: Usuario
   ): void {
-    const plantillas = this.getPlantillas();
+    const globalActual = this.getConfiguracionGlobal();
+    const nuevoGlobal = {
+      logoIzquierdoUrl: opciones.logoIzquierdoUrl || globalActual.logoIzquierdoUrl,
+      logoDerechoUrl: opciones.logoDerechoUrl || globalActual.logoDerechoUrl,
+      colorPrimario:
+        opciones.incluirColores && opciones.colorPrimario
+          ? opciones.colorPrimario
+          : globalActual.colorPrimario,
+      colorSecundario:
+        opciones.incluirColores && opciones.colorSecundario
+          ? opciones.colorSecundario
+          : globalActual.colorSecundario,
+      colorTextoEncabezado:
+        opciones.incluirColores && opciones.colorTextoEncabezado
+          ? opciones.colorTextoEncabezado
+          : globalActual.colorTextoEncabezado,
+    };
+    this.setConfiguracionGlobal(nuevoGlobal);
+
+    const plantillas = this.get<PlantillaDocumental[]>(STORAGE_KEYS.PLANTILLAS, PLANTILLAS_INICIALES);
     const actualizadas = plantillas.map((p) => ({
       ...p,
-      logoIzquierdoUrl: opciones.logoIzquierdoUrl ?? p.logoIzquierdoUrl,
-      logoDerechoUrl: opciones.logoDerechoUrl ?? p.logoDerechoUrl,
+      logoIzquierdoUrl: nuevoGlobal.logoIzquierdoUrl,
+      logoDerechoUrl: nuevoGlobal.logoDerechoUrl,
       ...(opciones.incluirColores
         ? {
-            colorPrimario: opciones.colorPrimario ?? p.colorPrimario,
-            colorSecundario: opciones.colorSecundario ?? p.colorSecundario,
-            colorTextoEncabezado: opciones.colorTextoEncabezado ?? p.colorTextoEncabezado,
+            colorPrimario: nuevoGlobal.colorPrimario,
+            colorSecundario: nuevoGlobal.colorSecundario,
+            colorTextoEncabezado: nuevoGlobal.colorTextoEncabezado,
           }
         : {}),
     }));
