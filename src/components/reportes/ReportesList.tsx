@@ -9,6 +9,7 @@ import {
   Copy,
   Download,
   FileCheck2,
+  ExternalLink,
 } from 'lucide-react';
 
 
@@ -275,15 +276,24 @@ export const ReportesList: React.FC<ReportesListProps> = ({
                   return (
                     <tr key={rep.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-3 px-4">
-                        <div className="font-mono font-bold text-slate-900 text-xs">
+                        <div className="font-mono font-bold text-slate-900 text-xs flex items-center gap-1.5">
                           {rep.numeroConsecutivo || (
                             <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                               {rep.tempId}
                             </span>
                           )}
+                          {rep.esHistorico && (
+                            <span className="bg-emerald-100 text-emerald-800 text-[9px] font-semibold px-1.5 py-0.2 rounded border border-emerald-200">
+                              Drive
+                            </span>
+                          )}
                         </div>
-                        <span className="text-[10px] text-slate-400 font-sans block">
-                          {tieneOficial ? 'Consecutivo Oficial' : 'Provisional (Borrador)'}
+                        <span className="text-[10px] text-slate-400 font-sans block truncate max-w-[180px]">
+                          {rep.esHistorico
+                            ? (rep.nombreArchivoOriginal || 'Histórico Drive')
+                            : tieneOficial
+                            ? 'Consecutivo Oficial'
+                            : 'Provisional (Borrador)'}
                         </span>
                       </td>
 
@@ -344,6 +354,18 @@ export const ReportesList: React.FC<ReportesListProps> = ({
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+
+                          {rep.googleDriveUrl && (
+                            <a
+                              href={rep.googleDriveUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ver en Google Drive"
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-md transition"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
 
                           {rep.estado !== 'emitido' && rep.estado !== 'anulado' && (
                             <button

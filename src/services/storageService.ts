@@ -47,6 +47,7 @@ const STORAGE_KEYS = {
   USUARIOS: 'cert_usuarios_v1',
   SESION: 'cert_sesion_activa_v1',
   MATRIZ_PERMISOS: 'cert_matriz_permisos_v1',
+  GOOGLE_DRIVE: 'cert_google_drive_v1',
 };
 
 class StorageService {
@@ -391,6 +392,116 @@ class StorageService {
     }
     this.set(STORAGE_KEYS.SERIES, series);
     supabaseService.guardarSerieEnNube(serie).catch(() => {});
+  }
+
+  // Configuración de Google Drive Institucional
+  public getGoogleDriveConfig(): {
+    folderUrl: string;
+    folderId: string;
+    conectado: boolean;
+  } {
+    return this.get(STORAGE_KEYS.GOOGLE_DRIVE, {
+      folderUrl: 'https://drive.google.com/drive/u/0/folders/1lM9S94X9RXKMMO0f9izpBJlsMeiBmcYm',
+      folderId: '1lM9S94X9RXKMMO0f9izpBJlsMeiBmcYm',
+      conectado: true,
+    });
+  }
+
+  public setGoogleDriveConfig(config: { folderUrl: string; folderId?: string; conectado: boolean }): void {
+    const folderId = config.folderId || config.folderUrl.split('folders/')[1]?.split('?')[0] || '';
+    this.set(STORAGE_KEYS.GOOGLE_DRIVE, {
+      ...config,
+      folderId,
+    });
+  }
+
+  // Calibración de serie consecutiva desde certificados históricos
+  public calibrarConsecutivoDesdeHistorico(
+    clasificacionCodigo: CodigoClasificacion,
+    nuevoUltimoNumero: number,
+    adminOperador?: Usuario
+  ): void {
+    const series = this.getSeries();
+    const idx = series.findIndex((s) => s.clasificacionCodigo === clasificacionCodigo);
+    if (idx !== -1) {
+      const numeroAnterior = series[idx].ultimoNumero;
+      series[idx].ultimoNumero = Math.max(series[idx].ultimoNumero, nuevoUltimoNumero);
+      this.set(STORAGE_KEYS.SERIES, series);
+      supabaseService.guardarSerieEnNube(series[idx]).catch(() => {});
+
+      if (adminOperador) {
+        this.registrarAuditoria({
+          usuarioId: adminOperador.id,
+          usuarioNombre: adminOperador.nombre,
+          rol: adminOperador.rol,
+          accion: 'CONFIGURACION',
+          entidad: 'serie',
+          entidadId: series[idx].id,
+          detalles: `Calibración de serie [${clasificacionCodigo}] desde certificados históricos. Consecutivo ajustado de ${numeroAnterior} a ${series[idx].ultimoNumero} (Próximo: ${series[idx].ultimoNumero + 1}).`,
+        });
+      }
+    }
+  }
+
+  // Registro de certificado histórico digitalizado en Google Drive
+  public importarCertificadoHistorico(
+    datos: {
+      numeroConsecutivo: string;
+      clasificacionCodigo: CodigoClasificacion;
+      clienteNombre?: string;
+      fechaEmision?: string;
+      nombreArchivo: string;
+      googleDriveUrl?: string;
+    },
+    usuario: Usuario
+  ): ReporteCertificado {
+    const driveCfg = this.getGoogleDriveConfig();
+    const id = `rep-hist-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const fecha = datos.fechaEmision || new Date().toISOString().split('T')[0];
+
+    const nuevoReporte: ReporteCertificado = {
+      id,
+      tempId: datos.numeroConsecutivo,
+      numeroConsecutivo: datos.numeroConsecutivo,
+      clasificacionCodigo: datos.clasificacionCodigo,
+      estado: 'emitido',
+      versionPlantilla: 'v1.0 (Histórico)',
+      clienteId: 'cli-hist',
+      clienteNombre: datos.clienteNombre || 'Cliente Histórico Nexatech',
+      direccionServicio: 'Archivo físico / digitalizado en Google Drive',
+      contratoOC: 'Emisión Histórica',
+      ubicacionServicio: 'Google Drive Nexatech',
+      equipoId: 'eq-hist',
+      fechaRecepcion: fecha,
+      fechaPrueba: fecha,
+      fechaEmision: fecha,
+      creadoPor: usuario,
+      aprobadoPor: usuario,
+      esHistorico: true,
+      nombreArchivoOriginal: datos.nombreArchivo,
+      googleDriveUrl: datos.googleDriveUrl || driveCfg.folderUrl,
+      transiciones: [
+        {
+          id: `trans-hist-${Date.now()}`,
+          estadoAnterior: 'borrador',
+          estadoNuevo: 'emitido',
+          usuarioId: usuario.id,
+          usuarioNombre: usuario.nombre,
+          rolUsuario: usuario.rol,
+          fecha: new Date().toISOString(),
+          observaciones: `Certificado histórico digitalizado en Google Drive (${datos.nombreArchivo})`,
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const reportes = this.getReportes();
+    reportes.unshift(nuevoReporte);
+    this.set(STORAGE_KEYS.REPORTES, reportes);
+    supabaseService.guardarReporteEnNube(nuevoReporte).catch(() => {});
+
+    return nuevoReporte;
   }
 
   // Configuración global institucional de logos y colores

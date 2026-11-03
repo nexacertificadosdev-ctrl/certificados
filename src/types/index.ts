@@ -305,6 +305,9 @@ export interface ReporteCertificado {
   
   transiciones: HistorialTransicion[];
   pdfGeneradoUrl?: string;
+  googleDriveUrl?: string;
+  esHistorico?: boolean;
+  nombreArchivoOriginal?: string;
   hashSha256?: string;
   motivoAnulacion?: string;
   createdAt: string;
