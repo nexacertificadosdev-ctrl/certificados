@@ -12,11 +12,11 @@ import {
   FileText, 
   ExternalLink, 
   FolderSync, 
-  ArrowRight,
   Sparkles,
   CheckCircle2,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 
 interface SeriesConfigProps {
@@ -24,6 +24,7 @@ interface SeriesConfigProps {
 }
 
 interface CertificadoDetectado {
+  idTemp: string;
   archivo?: File;
   nombre: string;
   consecutivoDetectado: number | null;
@@ -39,10 +40,10 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
   
   // Google Drive config
   const driveConfig = storageService.getGoogleDriveConfig();
-  const [clasificacionSeleccionada, setClasificacionSeleccionada] = useState<CodigoClasificacion>('VT');
   
-  // Importador histórico
+  // Importador histórico y sincronización
   const [archivosAnalizados, setArchivosAnalizados] = useState<CertificadoDetectado[]>([]);
+  const [filtroVisual, setFiltroVisual] = useState<string>('TODAS');
   const [calibracionExito, setCalibracionExito] = useState<string | null>(null);
   const [registrarEnLista, setRegistrarEnLista] = useState(true);
   const [subiendoADrive, setSubiendoADrive] = useState(false);
@@ -74,45 +75,42 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
     setTimeout(() => setGuardadoMsg(null), 3500);
   };
 
-  // Detector de clasificación según texto en el nombre del archivo
-  const detectarClasificacionDeNombre = (
-    nombreArchivo: string,
-    fallback: CodigoClasificacion
-  ): CodigoClasificacion => {
+  // Detector inteligente de clasificación técnica según el nombre del archivo
+  const detectarClasificacionDeNombre = (nombreArchivo: string): CodigoClasificacion => {
     const norm = nombreArchivo.toUpperCase();
-    if (norm.includes('TUBERIA') || norm.includes('SPOOL') || norm.includes('-TB-') || norm.includes('TB')) return 'TB';
+    if (norm.includes('TUBERIA') || norm.includes('SPOOL') || norm.includes('-TB-') || norm.includes('-SP-') || norm.includes('TB')) return 'TB';
     if (norm.includes('VALVULA') || norm.includes('PSV') || norm.includes('-VT-') || norm.includes('VT')) return 'VT';
     if (norm.includes('PRESION') || norm.includes('MANOMETRO') || norm.includes('-PR-') || norm.includes('PR')) return 'PR';
     if (norm.includes('TEMPERATURA') || norm.includes('TERMOMETRO') || norm.includes('-TM-') || norm.includes('TM')) return 'TM';
-    if (norm.includes('ELECTRICA') || norm.includes('VOLTAJE') || norm.includes('-EL-') || norm.includes('EL')) return 'EL';
-    return fallback;
+    if (norm.includes('ELECTRICA') || norm.includes('VOLTAJE') || norm.includes('-EL-') || norm.includes('-E-') || norm.includes('EL')) return 'EL';
+    return 'VT';
   };
 
-  // Analizador inteligente de nombres de archivos PDF
+  // Extractor inteligente del número consecutivo del certificado
   const extraerConsecutivoDeNombre = (nombreArchivo: string): number | null => {
     const nombreLimpio = nombreArchivo.replace(/\.pdf$/i, '');
     
-    // Intento 1: Patrón SP-1, VT-35, 0045, etc.
-    const matchSp = nombreLimpio.match(/(?:SP|TB|VT|PR|TM|EL|CERT|TEST)[-_ ]*(\d+)/i);
-    if (matchSp) {
-      const num = parseInt(matchSp[1], 10);
-      if (!(num >= 2020 && num <= 2030)) return num;
+    // Intento 1: Patrón completo [PREFIJO]-[CODIGO]-[NUMERO] ej. TEST-VT-78, TEST-SP-1, TEST-E-0001
+    const mPrefijo = nombreLimpio.match(/(?:TEST|CAL|CERT)[-_ ]*(?:VT|TB|SP|PR|TM|EL|E)[-_ ]*(\d+)/i);
+    if (mPrefijo) {
+      return parseInt(mPrefijo[1], 10);
     }
 
-    // Intento 2: Buscar bloques numéricos divididos por guiones/espacios
-    const partes = nombreLimpio.split(/[-_/\s()]+/);
-    for (let i = partes.length - 1; i >= 0; i--) {
-      const parte = partes[i];
-      if (/^\d+$/.test(parte)) {
-        const num = parseInt(parte, 10);
-        if (num >= 2020 && num <= 2030 && partes.length > 1) {
-          continue;
-        }
-        return num;
-      }
+    // Intento 2: Patrón [CODIGO]-[NUMERO] ej. VT-78, SP-1, E-0001
+    const mCodigo = nombreLimpio.match(/(?:VT|TB|SP|PR|TM|EL|E)[-_ ]*(\d+)/i);
+    if (mCodigo) {
+      return parseInt(mCodigo[1], 10);
     }
 
-    // Intento 3: Secuencia final de dígitos
+    // Intento 3: Eliminar contenido entre paréntesis que suele ser orden o serial secundario ej (28960394) o (FV-1834B)
+    const sinParentesis = nombreLimpio.replace(/\([^)]*\)/g, ' ');
+    const mDigits = sinParentesis.match(/\b\d+\b/g);
+    if (mDigits) {
+      const nums = mDigits.map((n) => parseInt(n, 10)).filter((n) => !(n >= 2020 && n <= 2030));
+      if (nums.length > 0) return nums[0];
+    }
+
+    // Intento 4: Secuencia de dígitos al final
     const matchFinal = nombreLimpio.match(/(\d+)(?:\D*)$/);
     if (matchFinal) {
       const num = parseInt(matchFinal[1], 10);
@@ -122,7 +120,7 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
     return null;
   };
 
-  // Sincronización directa desde Google Drive (lee los archivos que el usuario ya subió a la carpeta)
+  // Sincronización directa desde Google Drive (lee todos los archivos que ya están en la carpeta)
   const handleSincronizarDriveDirecto = async () => {
     setCargandoDrive(true);
     setNotificacionDrive(null);
@@ -140,10 +138,11 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
         return;
       }
 
-      const detectados: CertificadoDetectado[] = res.files.map((f: ArchivoDriveItem) => {
-        const clasif = detectarClasificacionDeNombre(f.name, clasificacionSeleccionada);
+      const detectados: CertificadoDetectado[] = res.files.map((f: ArchivoDriveItem, index: number) => {
+        const clasif = detectarClasificacionDeNombre(f.name);
         const consecutivo = extraerConsecutivoDeNombre(f.name);
         return {
+          idTemp: `drive-${f.id || index}-${Date.now()}`,
           nombre: f.name,
           consecutivoDetectado: consecutivo,
           codigoClasificacion: clasif,
@@ -154,16 +153,7 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
       });
 
       setArchivosAnalizados(detectados);
-
-      // Si se detectó alguna clasificación específica, actualizar el selector
-      const clasifsEncontradas = detectados.map((d) => d.codigoClasificacion);
-      if (clasifsEncontradas.includes('TB')) {
-        setClasificacionSeleccionada('TB');
-      } else if (clasifsEncontradas.length > 0) {
-        setClasificacionSeleccionada(clasifsEncontradas[0]);
-      }
-
-      setNotificacionDrive(`Se encontraron ${detectados.length} archivo(s) en tu carpeta de Google Drive.`);
+      setNotificacionDrive(`¡Sincronización exitosa! Se detectaron ${detectados.length} archivos en tu Google Drive.`);
       setTimeout(() => setNotificacionDrive(null), 5000);
     } catch (err: any) {
       setNotificacionDrive(`Error al consultar Google Drive: ${err.message}`);
@@ -181,75 +171,93 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
     if (!e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
 
-    const resultados: CertificadoDetectado[] = files.map((file) => {
+    const nuevos: CertificadoDetectado[] = files.map((file, idx) => {
+      const clasif = detectarClasificacionDeNombre(file.name);
       const consecutivo = extraerConsecutivoDeNombre(file.name);
       return {
+        idTemp: `local-${idx}-${Date.now()}`,
         archivo: file,
         nombre: file.name,
         consecutivoDetectado: consecutivo,
-        codigoClasificacion: clasificacionSeleccionada,
+        codigoClasificacion: clasif,
         origen: 'local',
       };
     });
 
-    setArchivosAnalizados(resultados);
+    setArchivosAnalizados((prev) => [...prev, ...nuevos]);
   };
 
-  // Filtrar archivos correspondientes a la clasificación actualmente seleccionada
-  const archivosFiltradosPorClasificacion = archivosAnalizados.filter(
-    (item) => item.codigoClasificacion === clasificacionSeleccionada
-  );
-
-  const maxConsecutivoDetectado = archivosFiltradosPorClasificacion.reduce((max, item) => {
-    if (item.consecutivoDetectado !== null && item.consecutivoDetectado > max) {
-      return item.consecutivoDetectado;
-    }
-    return max;
-  }, 0);
-
-  const handleAplicarCalibracion = async () => {
-    if (maxConsecutivoDetectado <= 0) return;
-
-    // 1. Calibrar serie
-    storageService.calibrarConsecutivoDesdeHistorico(
-      clasificacionSeleccionada,
-      maxConsecutivoDetectado,
-      usuarioActual
+  const handleCambiarClasificacionArchivo = (idTemp: string, nuevoCodigo: CodigoClasificacion) => {
+    setArchivosAnalizados((prev) =>
+      prev.map((item) => (item.idTemp === idTemp ? { ...item, codigoClasificacion: nuevoCodigo } : item))
     );
+  };
 
-    // 2. Si se eligió registrar en la lista de reportes para consulta
+  const handleCambiarConsecutivoArchivo = (idTemp: string, nuevoNum: number) => {
+    setArchivosAnalizados((prev) =>
+      prev.map((item) => (item.idTemp === idTemp ? { ...item, consecutivoDetectado: nuevoNum } : item))
+    );
+  };
+
+  // Cálculo de resumen agrupado por clasificación
+  const resumenPorClasificacion: Record<string, { count: number; maxNumero: number; items: CertificadoDetectado[] }> = {};
+  series.forEach((s) => {
+    resumenPorClasificacion[s.clasificacionCodigo] = { count: 0, maxNumero: 0, items: [] };
+  });
+
+  archivosAnalizados.forEach((item) => {
+    if (!resumenPorClasificacion[item.codigoClasificacion]) {
+      resumenPorClasificacion[item.codigoClasificacion] = { count: 0, maxNumero: 0, items: [] };
+    }
+    resumenPorClasificacion[item.codigoClasificacion].count += 1;
+    resumenPorClasificacion[item.codigoClasificacion].items.push(item);
+    if (
+      item.consecutivoDetectado !== null &&
+      item.consecutivoDetectado > resumenPorClasificacion[item.codigoClasificacion].maxNumero
+    ) {
+      resumenPorClasificacion[item.codigoClasificacion].maxNumero = item.consecutivoDetectado;
+    }
+  });
+
+  // Calibrar una clasificación individual
+  const calibrarClasificacion = async (codigoClasif: CodigoClasificacion, maxNum: number, items: CertificadoDetectado[]) => {
+    if (maxNum <= 0) return;
+
+    // 1. Calibrar serie en el servicio
+    storageService.calibrarConsecutivoDesdeHistorico(codigoClasif, maxNum, usuarioActual);
+
+    // 2. Registrar en historial si está marcado
     if (registrarEnLista) {
       setSubiendoADrive(true);
-      for (let i = 0; i < archivosFiltradosPorClasificacion.length; i++) {
-        const item = archivosFiltradosPorClasificacion[i];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         let driveUrl = item.driveUrl || driveConfig.folderUrl;
 
-        // Si es archivo local y aún no está en Drive, subirlo
         if (item.origen === 'local' && item.archivo) {
-          setProgresoSubida(`Subiendo a Google Drive (${i + 1}/${archivosFiltradosPorClasificacion.length}): ${item.nombre}`);
+          setProgresoSubida(`Subiendo a Google Drive (${i + 1}/${items.length}): ${item.nombre}`);
           try {
             const res = await driveService.subirArchivo(item.archivo, item.nombre);
             if (res.success && res.webViewLink) {
               driveUrl = res.webViewLink;
             }
           } catch (e) {
-            console.warn('Subida directa en background no completada, enlazando a carpeta:', e);
+            console.warn('Subida no completada, usando URL de carpeta', e);
           }
         }
 
         const serieActual = series.find(
-          (s) => s.clasificacionCodigo === clasificacionSeleccionada || s.id === `ser-${clasificacionSeleccionada.toLowerCase()}`
+          (s) => s.clasificacionCodigo === codigoClasif || s.id === `ser-${codigoClasif.toLowerCase()}`
         );
         const prefijo = serieActual?.prefijo || 'TEST';
         const numStr = item.consecutivoDetectado
           ? String(item.consecutivoDetectado).padStart(serieActual?.longitudDigitos || 4, '0')
           : '0001';
-        const consecutivoFinal = `${prefijo}-${clasificacionSeleccionada}-${new Date().getFullYear()}-${numStr}`;
+        const consecutivoFinal = `${prefijo}-${codigoClasif}-${new Date().getFullYear()}-${numStr}`;
 
         storageService.importarCertificadoHistorico(
           {
             numeroConsecutivo: consecutivoFinal,
-            clasificacionCodigo: clasificacionSeleccionada,
+            clasificacionCodigo: codigoClasif,
             nombreArchivo: item.nombre,
             googleDriveUrl: driveUrl,
           },
@@ -260,13 +268,36 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
       setProgresoSubida(null);
     }
 
-    // Refrescar series en estado
     setSeries(storageService.getSeries());
     setCalibracionExito(
-      `¡Serie [${clasificacionSeleccionada}] calibrada con éxito! Último número ajustado a ${maxConsecutivoDetectado}. El próximo certificado generado será el #${maxConsecutivoDetectado + 1}.`
+      `¡Serie [${codigoClasif}] calibrada con éxito! Último número ajustado a ${maxNum}. El próximo certificado nuevo será el #${maxNum + 1}.`
     );
     setTimeout(() => setCalibracionExito(null), 6000);
   };
+
+  // Calibrar todas las clasificaciones detectadas en 1 clic
+  const handleCalibrarTodasLasSeries = async () => {
+    const clasificacionesConArchivos = Object.entries(resumenPorClasificacion).filter(
+      ([_, data]) => data.count > 0 && data.maxNumero > 0
+    );
+
+    if (clasificacionesConArchivos.length === 0) return;
+
+    for (const [cod, data] of clasificacionesConArchivos) {
+      await calibrarClasificacion(cod as CodigoClasificacion, data.maxNumero, data.items);
+    }
+
+    setCalibracionExito(
+      `¡Todas las series detectadas (${clasificacionesConArchivos.length}) han sido calibradas con éxito! Las próximas emisiones continuarán en la secuencia correcta.`
+    );
+    setTimeout(() => setCalibracionExito(null), 7000);
+  };
+
+  // Filtrado de la lista según la pestaña seleccionada
+  const archivosMostrados = archivosAnalizados.filter((item) => {
+    if (filtroVisual === 'TODAS') return true;
+    return item.codigoClasificacion === filtroVisual;
+  });
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
@@ -285,7 +316,7 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
         {esAdmin && (
           <button
             onClick={handleGuardarTodo}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm text-sm transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm text-sm transition-all cursor-pointer"
           >
             <Save className="w-4 h-4" />
             Guardar Parámetros de Series
@@ -355,85 +386,157 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
         )}
       </div>
 
-      {/* SECCION 1: SUBIDA Y DETECCION DE HISTORICOS PARA CALIBRAR CONSECUTIVOS */}
+      {/* SECCION 1: PANEL DE CALIBRACIÓN MULTI-DISCIPLINA */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-indigo-600" />
-              Calibración Automática de Consecutivos desde Certificados Anteriores (PDF)
+              Panel de Calibración de Series desde Certificados Anteriores
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Selecciona la clasificación técnica o sincroniza con tu Google Drive. El sistema analiza los nombres de archivo, detecta el último número consecutivo emitido y ajusta la serie automáticamente para que la plataforma continúe la secuencia correcta.
+              El sistema lee todos los PDFs de tu Google Drive, clasifica automáticamente cada certificado (Válvulas, Tuberías, Eléctrica, etc.) y calcula el último número consecutivo emitido.
             </p>
           </div>
+
+          {archivosAnalizados.length > 0 && (
+            <button
+              onClick={handleCalibrarTodasLasSeries}
+              disabled={subiendoADrive}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl text-xs shadow-md transition cursor-pointer self-start sm:self-auto"
+            >
+              {subiendoADrive ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>{progresoSubida || 'Calibrando y sincronizando...'}</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 text-amber-300" />
+                  <span>Calibrar Todas las Series Detectadas</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {calibracionExito && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-800 text-sm">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <span className="font-medium">{calibracionExito}</span>
           </div>
         )}
 
+        {/* TARJETAS RESUMEN POR CADA CLASIFICACIÓN DETECTADA */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-              1. Clasificación Técnica
-            </label>
-            <select
-              value={clasificacionSeleccionada}
-              onChange={(e) => setClasificacionSeleccionada(e.target.value as CodigoClasificacion)}
-              className="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50 p-2.5 font-medium"
-            >
-              {series.map((s) => (
-                <option key={s.id} value={s.clasificacionCodigo}>
-                  [{s.clasificacionCodigo}] {s.nombre} (Último actual: #{s.ultimoNumero})
-                </option>
-              ))}
-            </select>
-          </div>
+          {series.map((s) => {
+            const data = resumenPorClasificacion[s.clasificacionCodigo] || { count: 0, maxNumero: 0, items: [] };
+            const tieneArchivos = data.count > 0;
 
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-              2. Subir Archivos Locales o Leer de Google Drive
-            </label>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/70 rounded-xl p-4 cursor-pointer transition-all">
-              <UploadCloud className="w-8 h-8 text-indigo-500 mb-1" />
-              <span className="text-xs font-medium text-indigo-900">
-                Haz clic para seleccionar archivos PDF locales, o haz clic en "Sincronizar Archivos de Google Drive" arriba
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">
-                (Formatos soportados: TEST-SP-1 (TUBERIA).pdf, TEST-VT-2026-0035.pdf, VT-0042.pdf, etc.)
-              </span>
-              <input
-                type="file"
-                multiple
-                accept=".pdf"
-                className="hidden"
-                onChange={handleFilesSelected}
-              />
-            </label>
-          </div>
+            return (
+              <div
+                key={s.id}
+                className={`p-4 rounded-xl border transition-all ${
+                  tieneArchivos
+                    ? 'bg-gradient-to-br from-slate-50 to-indigo-50/30 border-indigo-200 shadow-xs'
+                    : 'bg-slate-50/50 border-slate-200 opacity-70'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded font-bold">
+                    [{s.clasificacionCodigo}] {s.nombre}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {data.count} archivo(s)
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-baseline justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block uppercase font-medium">Último detectado</span>
+                    <span className="text-xl font-mono font-bold text-slate-900">
+                      {data.maxNumero > 0 ? `#${data.maxNumero}` : 'Sin archivos'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-500 block uppercase font-medium">Serie actual</span>
+                    <span className="text-sm font-mono text-slate-600">
+                      #{s.ultimoNumero}
+                    </span>
+                  </div>
+                </div>
+
+                {tieneArchivos && (
+                  <button
+                    onClick={() => calibrarClasificacion(s.clasificacionCodigo, data.maxNumero, data.items)}
+                    disabled={subiendoADrive || data.maxNumero <= 0}
+                    className="mt-3 w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Calibrar serie a #{data.maxNumero}</span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Listado de archivos analizados */}
-        {archivosFiltradosPorClasificacion.length > 0 && (
+        {/* ZONA DE ARRASTRE PARA ARCHIVOS LOCALES ADICIONALES */}
+        <div>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/30 hover:bg-indigo-50/60 rounded-xl p-4 cursor-pointer transition-all">
+            <UploadCloud className="w-7 h-7 text-indigo-500 mb-1" />
+            <span className="text-xs font-medium text-indigo-900">
+              ¿Tienes más certificados en tu computador? Haz clic aquí o arrástralos para analizarlos también
+            </span>
+            <input
+              type="file"
+              multiple
+              accept=".pdf"
+              className="hidden"
+              onChange={handleFilesSelected}
+            />
+          </label>
+        </div>
+
+        {/* LISTADO DE TODOS LOS ARCHIVOS ANALIZADOS CON PESTAÑAS DE FILTRO */}
+        {archivosAnalizados.length > 0 && (
           <div className="space-y-4 pt-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Archivos Detectados para [{clasificacionSeleccionada}]: {archivosFiltradosPorClasificacion.length}
-                </span>
-                <p className="text-sm font-semibold text-slate-900 mt-0.5">
-                  Último número consecutivo detectado:{' '}
-                  <span className="text-indigo-600 text-lg font-bold font-mono">
-                    #{maxConsecutivoDetectado > 0 ? maxConsecutivoDetectado : 'No detectado'}
-                  </span>
-                </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              {/* Pestañas de filtro rápido */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFiltroVisual('TODAS')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    filtroVisual === 'TODAS'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Todos ({archivosAnalizados.length})
+                </button>
+
+                {series.map((s) => {
+                  const count = resumenPorClasificacion[s.clasificacionCodigo]?.count || 0;
+                  if (count === 0) return null;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setFiltroVisual(s.clasificacionCodigo)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        filtroVisual === s.clasificacionCodigo
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      [{s.clasificacionCodigo}] ({count})
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -443,58 +546,61 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
                   />
                   <span>Registrar en historial con enlace a Drive</span>
                 </label>
-
-                <button
-                  onClick={handleAplicarCalibracion}
-                  disabled={maxConsecutivoDetectado <= 0 || subiendoADrive}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg text-sm shadow-sm transition-all cursor-pointer"
-                >
-                  {subiendoADrive ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{progresoSubida || 'Procesando...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      <span>Calibrar Serie [{clasificacionSeleccionada}] a #{maxConsecutivoDetectado}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
               </div>
             </div>
 
-            <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
-              {archivosFiltradosPorClasificacion.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 text-xs hover:bg-slate-50">
+            {/* Lista detallada de archivos */}
+            <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+              {archivosMostrados.map((item) => (
+                <div key={item.idTemp} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 text-xs hover:bg-slate-50 gap-2">
                   <div className="flex items-center gap-2.5 truncate">
-                    <FileText className="w-4 h-4 text-rose-500 flex-shrink-0" />
-                    <span className="font-mono text-slate-800 truncate">{item.nombre}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 border border-slate-200 uppercase font-semibold">
-                      {item.origen === 'drive' ? 'En Google Drive' : 'Local'}
+                    <FileText className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span className="font-mono text-slate-800 truncate max-w-sm sm:max-w-md" title={item.nombre}>
+                      {item.nombre}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 border border-slate-200 uppercase font-semibold shrink-0">
+                      {item.origen === 'drive' ? 'Google Drive' : 'Local'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Selector de Clasificación editable por archivo si se desea corregir */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-400 font-semibold">Tipo:</span>
+                      <select
+                        value={item.codigoClasificacion}
+                        onChange={(e) => handleCambiarClasificacionArchivo(item.idTemp, e.target.value as CodigoClasificacion)}
+                        className="text-[11px] font-bold bg-white border border-slate-300 rounded px-1.5 py-0.5 text-indigo-700"
+                      >
+                        {series.map((s) => (
+                          <option key={s.id} value={s.clasificacionCodigo}>
+                            [{s.clasificacionCodigo}] {s.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Consecutivo detectado editable */}
+                    <div className="flex items-center gap-1 font-mono">
+                      <span className="text-[10px] text-slate-400 font-semibold">Num:</span>
+                      <input
+                        type="number"
+                        value={item.consecutivoDetectado ?? ''}
+                        onChange={(e) => handleCambiarConsecutivoArchivo(item.idTemp, parseInt(e.target.value, 10) || 0)}
+                        className="w-16 px-1.5 py-0.5 border border-indigo-200 bg-indigo-50/50 rounded text-center font-bold text-indigo-800 text-xs"
+                      />
+                    </div>
+
                     {item.driveUrl && (
                       <a
                         href={item.driveUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-emerald-600 hover:underline flex items-center gap-1 text-[11px]"
+                        className="text-emerald-600 hover:underline flex items-center gap-1 text-[11px] font-medium"
                       >
                         <span>Ver en Drive</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
-                    )}
-                    {item.consecutivoDetectado !== null ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-mono font-bold">
-                        Consecutivo: #{item.consecutivoDetectado}
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
-                        Sin número evidente
-                      </span>
                     )}
                   </div>
                 </div>
