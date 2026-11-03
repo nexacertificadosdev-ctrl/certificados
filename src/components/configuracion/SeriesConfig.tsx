@@ -420,9 +420,22 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
                   <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4 font-semibold text-slate-900">{s.nombre}</td>
                     <td className="py-3 px-4">
-                      <span className="font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-bold">
-                        {s.clasificacionCodigo}
-                      </span>
+                      {esAdmin ? (
+                        <input
+                          type="text"
+                          value={s.clasificacionCodigo}
+                          onChange={(e) =>
+                            handleUpdate(s.id, 'clasificacionCodigo', e.target.value.toUpperCase())
+                          }
+                          maxLength={8}
+                          className="w-16 px-2 py-1 border border-blue-300 bg-blue-50/60 focus:bg-white rounded font-mono font-bold text-blue-700 text-xs text-center focus:ring-2 focus:ring-blue-400 outline-none uppercase"
+                          title="Código de clasificación técnica (editable por el Administrador)"
+                        />
+                      ) : (
+                        <span className="font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-bold">
+                          {s.clasificacionCodigo}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <input

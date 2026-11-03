@@ -422,7 +422,16 @@ class StorageService {
     adminOperador?: Usuario
   ): void {
     const series = this.getSeries();
-    const idx = series.findIndex((s) => s.clasificacionCodigo === clasificacionCodigo);
+    const mapaDefault: Record<string, string> = {
+      VT: 'ser-1',
+      TB: 'ser-2',
+      PR: 'ser-3',
+      TM: 'ser-4',
+      EL: 'ser-5',
+    };
+    const idx = series.findIndex(
+      (s) => s.clasificacionCodigo === clasificacionCodigo || s.id === mapaDefault[clasificacionCodigo]
+    );
     if (idx !== -1) {
       const numeroAnterior = series[idx].ultimoNumero;
       series[idx].ultimoNumero = Math.max(series[idx].ultimoNumero, nuevoUltimoNumero);
@@ -437,7 +446,7 @@ class StorageService {
           accion: 'CONFIGURACION',
           entidad: 'serie',
           entidadId: series[idx].id,
-          detalles: `Calibración de serie [${clasificacionCodigo}] desde certificados históricos. Consecutivo ajustado de ${numeroAnterior} a ${series[idx].ultimoNumero} (Próximo: ${series[idx].ultimoNumero + 1}).`,
+          detalles: `Calibración de serie [${series[idx].clasificacionCodigo}] desde certificados históricos. Consecutivo ajustado de ${numeroAnterior} a ${series[idx].ultimoNumero} (Próximo: ${series[idx].ultimoNumero + 1}).`,
         });
       }
     }
@@ -724,7 +733,16 @@ class StorageService {
    */
   public asignarSiguienteConsecutivo(clasificacionCodigo: CodigoClasificacion): string {
     const series = this.getSeries();
-    const serieIndex = series.findIndex(s => s.clasificacionCodigo === clasificacionCodigo && s.activa);
+    const mapaDefault: Record<string, string> = {
+      VT: 'ser-1',
+      TB: 'ser-2',
+      PR: 'ser-3',
+      TM: 'ser-4',
+      EL: 'ser-5',
+    };
+    const serieIndex = series.findIndex(
+      (s) => (s.clasificacionCodigo === clasificacionCodigo || s.id === mapaDefault[clasificacionCodigo]) && s.activa
+    );
     
     if (serieIndex === -1) {
       throw new Error(`No existe una serie consecutiva activa para la clasificación ${clasificacionCodigo}`);

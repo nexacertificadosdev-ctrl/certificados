@@ -39,7 +39,7 @@ export interface PermisoDefinicion {
 
 export type MatrizPermisos = Record<RolUsuario, ModuloPermiso[]>;
 
-export type CodigoClasificacion = 'VT' | 'TB' | 'PR' | 'TM' | 'EL';
+export type CodigoClasificacion = 'VT' | 'TB' | 'PR' | 'TM' | 'EL' | (string & {});
 
 export interface Clasificacion {
   id: string;
