@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Usuario } from '../../types';
+import { storageService } from '../../services/storageService';
 import {
   Search,
   Plus,
@@ -59,8 +60,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <span>{fechaTexto}</span>
         </div>
 
-        {/* Botón Principal "+ Nuevo Ensayo" en verde esmeralda */}
-        {['tecnico', 'administrador'].includes(usuarioActual.rol) && (
+        {/* Botón Principal "+ Nuevo Ensayo" según permisos */}
+        {storageService.tienePermiso(usuarioActual.rol, 'reportes_crear') && (
           <button
             onClick={onNuevoReporte}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#00875a] hover:bg-[#047857] active:scale-95 text-white rounded-2xl text-xs font-bold shadow-sm transition-all cursor-pointer"

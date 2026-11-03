@@ -17,8 +17,11 @@ import { FirmaModal } from './components/common/FirmaModal';
 import { SeriesConfig } from './components/configuracion/SeriesConfig';
 import { PlantillasConfig } from './components/configuracion/PlantillasConfig';
 import { ClientesEquiposConfig } from './components/configuracion/ClientesEquiposConfig';
+import { UsuariosRolesConfig } from './components/configuracion/UsuariosRolesConfig';
 import { AuditoriaView } from './components/auditoria/AuditoriaView';
 import { VerificadorPublico } from './components/verificacion/VerificadorPublico';
+import { LoginView } from './components/auth/LoginView';
+import { LogIn, Award } from 'lucide-react';
 
 export function App() {
   // Inicialización de la persistencia local
@@ -26,7 +29,14 @@ export function App() {
     storageService.init();
   }, []);
 
-  const [usuarioActual, setUsuarioActual] = useState<Usuario>(storageService.getUsuarioActual());
+  const [usuarioActual, setUsuarioActual] = useState<Usuario | null>(() => storageService.getSesionUsuario());
+  const [vistaPublicaVerificacion, setVistaPublicaVerificacion] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.hash.includes('cert=') || window.location.hash.includes('verificar');
+    }
+    return false;
+  });
+
   const usuariosDisponibles = storageService.getUsuarios();
 
   const [reportes, setReportes] = useState<ReporteCertificado[]>(storageService.getReportes());
@@ -37,6 +47,21 @@ export function App() {
   const [vistaActual, setVistaActual] = useState<string>('dashboard');
   const [reporteSeleccionado, setReporteSeleccionado] = useState<ReporteCertificado | null>(null);
   const [sidebarColapsado, setSidebarColapsado] = useState<boolean>(false);
+
+  // Escuchar cambios de hash para validador público QR
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash.includes('cert=') || window.location.hash.includes('verificar')) {
+        if (!storageService.getSesionUsuario()) {
+          setVistaPublicaVerificacion(true);
+        } else {
+          setVistaActual('verificar');
+        }
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   // Modales
   const [modalRevisionReporte, setModalRevisionReporte] = useState<ReporteCertificado | null>(null);
@@ -64,6 +89,11 @@ export function App() {
     setUsuarioActual(usuario);
   };
 
+  const handleCerrarSesion = () => {
+    storageService.cerrarSesion();
+    setUsuarioActual(null);
+  };
+
   const handleVerPdf = (reporte: ReporteCertificado) => {
     setReporteSeleccionado(reporte);
     setVistaActual('ver-pdf');
@@ -86,7 +116,7 @@ export function App() {
   };
 
   const handleCopiarComoBase = (reporteOriginal: ReporteCertificado) => {
-    // Clonar datos técnicos sin copiar consecutivos ni estados previos
+    if (!usuarioActual) return;
     const nuevo = storageService.crearBorrador(
       {
         clasificacionCodigo: reporteOriginal.clasificacionCodigo,
@@ -118,6 +148,58 @@ export function App() {
     }
   };
 
+  // =========================================================
+  // CONTROL DE ACCESO: PANTALLA LOGIN O VALIDADOR PÚBLICO
+  // =========================================================
+  if (!usuarioActual) {
+    if (vistaPublicaVerificacion) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex flex-col font-sans">
+          <header className="px-6 py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between sticky top-0 z-20 backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#00875a] flex items-center justify-center text-white shadow-xs">
+                <Award className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div>
+                <span className="font-extrabold text-base tracking-tight text-white block">
+                  CertiGest
+                </span>
+                <span className="text-[11px] text-slate-400 block -mt-0.5">
+                  Validador Público de Integridad Metrológica
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setVistaPublicaVerificacion(false)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Iniciar Sesión</span>
+            </button>
+          </header>
+
+          <main className="flex-1 p-4 sm:p-8 max-w-5xl mx-auto w-full">
+            <VerificadorPublico onVerReporteDetalle={handleVerPdf} />
+          </main>
+        </div>
+      );
+    }
+
+    return (
+      <LoginView
+        onLoginSuccess={(u) => {
+          setUsuarioActual(u);
+          setVistaActual('dashboard');
+        }}
+        onIrAVerificadorPublico={() => setVistaPublicaVerificacion(true)}
+      />
+    );
+  }
+
+  // =========================================================
+  // USUARIO AUTENTICADO: APLICACIÓN PRINCIPAL
+  // =========================================================
   return (
     <div className="h-screen w-screen bg-[#f8fafc] flex overflow-hidden font-sans print:h-auto print:w-auto print:overflow-visible print:bg-white print:block">
       {/* 1. Menú Lateral Izquierdo (Sidebar) */}
@@ -130,6 +212,7 @@ export function App() {
         usuarioActual={usuarioActual}
         usuariosDisponibles={usuariosDisponibles}
         onCambiarUsuario={handleCambiarUsuario}
+        onCerrarSesion={handleCerrarSesion}
         onAbrirModalFirma={() => setModalFirmaAbierto(true)}
         colapsado={sidebarColapsado}
         onToggleColapsado={() => setSidebarColapsado(!sidebarColapsado)}
@@ -227,6 +310,10 @@ export function App() {
 
           {vistaActual === 'clientes-equipos' && (
             <ClientesEquiposConfig usuarioActual={usuarioActual} />
+          )}
+
+          {vistaActual === 'usuarios-roles' && (
+            <UsuariosRolesConfig usuarioActual={usuarioActual} />
           )}
 
           {vistaActual === 'series' && <SeriesConfig usuarioActual={usuarioActual} />}

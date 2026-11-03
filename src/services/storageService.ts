@@ -10,6 +10,9 @@ import type {
   SerieConsecutiva,
   Usuario,
   EquipoPatron,
+  RolUsuario,
+  ModuloPermiso,
+  MatrizPermisos,
 } from '../types';
 import {
   CLASIFICACIONES_INICIALES,
@@ -20,6 +23,7 @@ import {
   REPORTES_INICIALES,
   SERIES_INICIALES,
   USUARIOS_INICIALES,
+  MATRIZ_PERMISOS_INICIAL,
 } from './mockData';
 import {
   DEFAULT_LOGO_IZQUIERDO,
@@ -40,6 +44,9 @@ const STORAGE_KEYS = {
   CONFIG_GLOBAL: 'cert_config_global_v1',
   AUDITORIA: 'cert_auditoria_v1',
   USUARIO_ACTUAL: 'cert_usuario_actual_v1',
+  USUARIOS: 'cert_usuarios_v1',
+  SESION: 'cert_sesion_activa_v1',
+  MATRIZ_PERMISOS: 'cert_matriz_permisos_v1',
 };
 
 class StorageService {
@@ -120,6 +127,12 @@ class StorageService {
       ];
       this.set(STORAGE_KEYS.AUDITORIA, auditInicial);
     }
+    if (!localStorage.getItem(STORAGE_KEYS.USUARIOS)) {
+      this.set(STORAGE_KEYS.USUARIOS, USUARIOS_INICIALES);
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.MATRIZ_PERMISOS)) {
+      this.set(STORAGE_KEYS.MATRIZ_PERMISOS, MATRIZ_PERMISOS_INICIAL);
+    }
     if (!localStorage.getItem(STORAGE_KEYS.USUARIO_ACTUAL)) {
       this.set(STORAGE_KEYS.USUARIO_ACTUAL, USUARIOS_INICIALES[0]); // Por defecto Técnico
     }
@@ -154,29 +167,136 @@ class StorageService {
     }
   }
 
-  // Usuario actual
+  // ==========================================
+  // GESTIÓN DE SESIÓN, USUARIOS & PERMISOS RBAC
+  // ==========================================
+
+  public getSesionUsuario(): Usuario | null {
+    return this.get<Usuario | null>(STORAGE_KEYS.SESION, null);
+  }
+
+  public setSesionUsuario(usuario: Usuario | null): void {
+    if (usuario) {
+      this.set(STORAGE_KEYS.SESION, usuario);
+      this.set(STORAGE_KEYS.USUARIO_ACTUAL, usuario);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.SESION);
+    }
+  }
+
+  public cerrarSesion(): void {
+    localStorage.removeItem(STORAGE_KEYS.SESION);
+  }
+
+  // Usuario activo en el sistema
   public getUsuarioActual(): Usuario {
+    const sesion = this.getSesionUsuario();
+    if (sesion) return sesion;
     return this.get<Usuario>(STORAGE_KEYS.USUARIO_ACTUAL, USUARIOS_INICIALES[0]);
   }
 
   public setUsuarioActual(usuario: Usuario): void {
     this.set(STORAGE_KEYS.USUARIO_ACTUAL, usuario);
+    this.set(STORAGE_KEYS.SESION, usuario);
   }
 
   public getUsuarios(): Usuario[] {
-    return USUARIOS_INICIALES;
+    const lista = this.get<Usuario[]>(STORAGE_KEYS.USUARIOS, USUARIOS_INICIALES);
+    return lista.length > 0 ? lista : USUARIOS_INICIALES;
+  }
+
+  public guardarUsuario(usuario: Usuario, adminOperador?: Usuario): void {
+    const usuarios = this.getUsuarios();
+    const index = usuarios.findIndex((u) => u.id === usuario.id);
+    const esNuevo = index === -1;
+
+    if (index >= 0) {
+      usuarios[index] = { ...usuarios[index], ...usuario };
+    } else {
+      usuarios.push(usuario);
+    }
+
+    this.set(STORAGE_KEYS.USUARIOS, usuarios);
+
+    // Si se actualizó el usuario con sesión activa, refrescar sesión
+    const sesion = this.getSesionUsuario();
+    if (sesion && sesion.id === usuario.id) {
+      this.setSesionUsuario({ ...sesion, ...usuario });
+    }
+
+    if (adminOperador) {
+      this.registrarAuditoria({
+        usuarioId: adminOperador.id,
+        usuarioNombre: adminOperador.nombre,
+        rol: adminOperador.rol,
+        accion: 'CONFIGURACION',
+        entidad: 'usuario',
+        entidadId: usuario.id,
+        detalles: `${esNuevo ? 'Creación' : 'Actualización'} de usuario "${usuario.nombre}" (${usuario.email}) con rol [${usuario.rol}]`,
+      });
+    }
+  }
+
+  public eliminarUsuario(id: string, adminOperador?: Usuario): void {
+    const usuarios = this.getUsuarios();
+    const target = usuarios.find((u) => u.id === id);
+    const nuevas = usuarios.filter((u) => u.id !== id);
+    this.set(STORAGE_KEYS.USUARIOS, nuevas);
+
+    if (adminOperador && target) {
+      this.registrarAuditoria({
+        usuarioId: adminOperador.id,
+        usuarioNombre: adminOperador.nombre,
+        rol: adminOperador.rol,
+        accion: 'CONFIGURACION',
+        entidad: 'usuario',
+        entidadId: id,
+        detalles: `Eliminación de usuario "${target.nombre}" (${target.email})`,
+      });
+    }
+  }
+
+  // Matriz de Permisos por Rol
+  public getMatrizPermisos(): MatrizPermisos {
+    return this.get<MatrizPermisos>(STORAGE_KEYS.MATRIZ_PERMISOS, MATRIZ_PERMISOS_INICIAL);
+  }
+
+  public guardarMatrizPermisos(matriz: MatrizPermisos, adminOperador?: Usuario): void {
+    this.set(STORAGE_KEYS.MATRIZ_PERMISOS, matriz);
+    if (adminOperador) {
+      this.registrarAuditoria({
+        usuarioId: adminOperador.id,
+        usuarioNombre: adminOperador.nombre,
+        rol: adminOperador.rol,
+        accion: 'CONFIGURACION',
+        entidad: 'permisos',
+        entidadId: 'matriz_global',
+        detalles: `Actualización de matriz global de permisos y roles del sistema.`,
+      });
+    }
+  }
+
+  public tienePermiso(rol: RolUsuario, permiso: ModuloPermiso): boolean {
+    if (rol === 'administrador') return true; // El Administrador siempre tiene todos los privilegios
+    const matriz = this.getMatrizPermisos();
+    const permisosDelRol = matriz[rol] || [];
+    return permisosDelRol.includes(permiso);
   }
 
   public actualizarFirmaUsuario(usuarioId: string, firmaUrl: string): void {
+    const usuarios = this.getUsuarios();
+    const idx = usuarios.findIndex((u) => u.id === usuarioId);
+    if (idx !== -1) {
+      usuarios[idx].firmaUrl = firmaUrl;
+      this.set(STORAGE_KEYS.USUARIOS, usuarios);
+    }
+
     const usuarioActual = this.getUsuarioActual();
     if (usuarioActual.id === usuarioId) {
       usuarioActual.firmaUrl = firmaUrl;
       this.setUsuarioActual(usuarioActual);
     }
-    const idx = USUARIOS_INICIALES.findIndex(u => u.id === usuarioId);
-    if (idx !== -1) {
-      USUARIOS_INICIALES[idx].firmaUrl = firmaUrl;
-    }
+
     supabaseService.actualizarFirmaEnNube(usuarioId, firmaUrl).catch(() => {});
   }
 

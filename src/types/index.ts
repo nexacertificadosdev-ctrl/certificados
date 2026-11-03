@@ -14,7 +14,30 @@ export interface Usuario {
   cargo: string;
   rol: RolUsuario;
   firmaUrl?: string; // Imagen de la firma subida
+  activo?: boolean;
+  password?: string; // Credencial hash o contraseña inicial de acceso
 }
+
+export type ModuloPermiso = 
+  | 'reportes_crear'
+  | 'reportes_revisar'
+  | 'reportes_aprobar_emitir'
+  | 'reportes_anular'
+  | 'series_gestionar'
+  | 'plantillas_gestionar'
+  | 'clientes_gestionar'
+  | 'patrones_gestionar'
+  | 'auditoria_ver'
+  | 'usuarios_gestionar';
+
+export interface PermisoDefinicion {
+  id: ModuloPermiso;
+  nombre: string;
+  descripcion: string;
+  categoria: 'Operación & Ensayos' | 'Gestión de Calidad' | 'Configuración Maestra' | 'Seguridad & Auditoría';
+}
+
+export type MatrizPermisos = Record<RolUsuario, ModuloPermiso[]>;
 
 export type CodigoClasificacion = 'VT' | 'TB' | 'PR' | 'TM' | 'EL';
 
@@ -294,7 +317,7 @@ export interface RegistroAuditoria {
   usuarioNombre: string;
   rol: RolUsuario;
   accion: 'CREAR' | 'MODIFICAR' | 'ENVIAR_REVISION' | 'DEVOLVER' | 'APROBAR' | 'EMITIR' | 'ANULAR' | 'CONFIGURACION';
-  entidad: 'reporte' | 'serie' | 'cliente' | 'equipo' | 'plantilla';
+  entidad: 'reporte' | 'serie' | 'cliente' | 'equipo' | 'plantilla' | 'usuario' | 'permisos';
   entidadId: string;
   detalles: string;
   valoresPrevios?: any;

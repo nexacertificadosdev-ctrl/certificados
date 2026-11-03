@@ -16,6 +16,8 @@ import {
   ChevronRight,
   Database,
   Award,
+  LogOut,
+  UserCog,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,6 +26,7 @@ interface SidebarProps {
   usuarioActual: Usuario;
   usuariosDisponibles: Usuario[];
   onCambiarUsuario: (usuario: Usuario) => void;
+  onCerrarSesion: () => void;
   onAbrirModalFirma: () => void;
   colapsado: boolean;
   onToggleColapsado: () => void;
@@ -50,14 +53,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   vistaActual,
   onCambiarVista,
   usuarioActual,
-  usuariosDisponibles,
-  onCambiarUsuario,
+  usuariosDisponibles: _usuariosDisponibles,
+  onCambiarUsuario: _onCambiarUsuario,
+  onCerrarSesion,
   onAbrirModalFirma,
   colapsado,
   onToggleColapsado,
   reportesEnRevision = 0,
   patronesVencidos = 0,
 }) => {
+  const puedeGestionarUsuarios = ['administrador', 'director_tecnico'].includes(usuarioActual.rol);
+
   const gruposNavegacion: NavGroup[] = [
     {
       categoria: 'MENÚ PRINCIPAL',
@@ -109,6 +115,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       categoria: 'CONFIGURACIÓN & SISTEMA',
       items: [
+        ...(puedeGestionarUsuarios
+          ? [
+              {
+                id: 'usuarios-roles',
+                label: 'Usuarios & Permisos RBAC',
+                icon: UserCog,
+              },
+            ]
+          : []),
         {
           id: 'series',
           label: 'Series & Consecutivos',
@@ -277,40 +292,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Sección de Usuario y Rol de Simulación */}
-        <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-200/60">
-          <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
-            {usuarioActual.nombre
-              .split(' ')
-              .map((n) => n[0])
-              .slice(0, 2)
-              .join('')}
+        {/* Perfil del Usuario Autenticado & Botón Cerrar Sesión */}
+        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/60">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+              {usuarioActual.nombre
+                .split(' ')
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join('')}
+            </div>
+
+            {!colapsado && (
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold text-slate-900 truncate">
+                  {usuarioActual.nombre}
+                </div>
+                <div className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider truncate flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>{usuarioActual.rol.replace('_', ' ')}</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {!colapsado && (
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">
-                {usuarioActual.nombre}
-              </div>
-              <div className="flex items-center gap-1">
-                <select
-                  aria-label="Cambiar rol activo de simulación"
-                  value={usuarioActual.id}
-                  onChange={(e) => {
-                    const u = usuariosDisponibles.find((usr) => usr.id === e.target.value);
-                    if (u) onCambiarUsuario(u);
-                  }}
-                  className="bg-transparent text-[10px] text-slate-500 font-bold uppercase tracking-wider focus:outline-none cursor-pointer truncate max-w-[130px]"
-                >
-                  {usuariosDisponibles.map((u) => (
-                    <option key={u.id} value={u.id} className="text-slate-900">
-                      {u.rol} ({u.nombre})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={onCerrarSesion}
+            title="Cerrar Sesión"
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </aside>

@@ -7,6 +7,8 @@ import type {
   Usuario,
   ReporteCertificado,
   PlantillaDocumental,
+  PermisoDefinicion,
+  MatrizPermisos,
 } from '../types';
 import {
   DEFAULT_LOGO_IZQUIERDO,
@@ -16,6 +18,109 @@ import {
   DEFAULT_COLOR_TEXTO,
 } from '../utils/themeDefaults';
 
+export const PERMISOS_DEFINICIONES: PermisoDefinicion[] = [
+  {
+    id: 'reportes_crear',
+    nombre: 'Crear y Editar Borradores de Reportes',
+    descripcion: 'Permite registrar nuevos ensayos, calibraciones y pruebas metrológicas en estado borrador.',
+    categoria: 'Operación & Ensayos',
+  },
+  {
+    id: 'reportes_revisar',
+    nombre: 'Revisión Técnica y Control de Calidad',
+    descripcion: 'Permite aprobar la revisión técnica o devolver reportes a borrador con observaciones.',
+    categoria: 'Operación & Ensayos',
+  },
+  {
+    id: 'reportes_aprobar_emitir',
+    nombre: 'Aprobar y Emitir Certificados Oficiales',
+    descripcion: 'Permite aprobar y emitir con firma digital y consecutivo oficial definitivo.',
+    categoria: 'Operación & Ensayos',
+  },
+  {
+    id: 'reportes_anular',
+    nombre: 'Anular Certificados Emitidos',
+    descripcion: 'Permite anular un certificado emitido registrando justificación formal y motivo en auditoría.',
+    categoria: 'Operación & Ensayos',
+  },
+  {
+    id: 'clientes_gestionar',
+    nombre: 'Gestión de Clientes e Instrumentos',
+    descripcion: 'Permite crear, editar y archivar clientes, sedes y equipos de clientes.',
+    categoria: 'Configuración Maestra',
+  },
+  {
+    id: 'patrones_gestionar',
+    nombre: 'Gestión de Patrones Trazables (ISO 17025)',
+    descripcion: 'Permite registrar y actualizar patrones de referencia, vigencias y números de calibración.',
+    categoria: 'Gestión de Calidad',
+  },
+  {
+    id: 'series_gestionar',
+    nombre: 'Configuración de Series y Consecutivos',
+    descripcion: 'Permite configurar los prefijos, dígitos, formato y reinicio anual de numeración técnica.',
+    categoria: 'Configuración Maestra',
+  },
+  {
+    id: 'plantillas_gestionar',
+    nombre: 'Personalización de Plantillas, Logos y Colores',
+    descripcion: 'Permite cambiar encabezados, títulos normativos, paletas de colores y logotipos corporativos.',
+    categoria: 'Configuración Maestra',
+  },
+  {
+    id: 'auditoria_ver',
+    nombre: 'Consultar Registro Inmutable de Auditoría',
+    descripcion: 'Permite inspeccionar el registro de trazabilidad con fecha, hora, rol y detalle de cada acción.',
+    categoria: 'Seguridad & Auditoría',
+  },
+  {
+    id: 'usuarios_gestionar',
+    nombre: 'Administración de Usuarios, Roles y Permisos',
+    descripcion: 'Permite crear cuentas, reasignar roles, activar/desactivar accesos y modificar la matriz de permisos.',
+    categoria: 'Seguridad & Auditoría',
+  },
+];
+
+export const MATRIZ_PERMISOS_INICIAL: MatrizPermisos = {
+  administrador: [
+    'reportes_crear',
+    'reportes_revisar',
+    'reportes_aprobar_emitir',
+    'reportes_anular',
+    'clientes_gestionar',
+    'patrones_gestionar',
+    'series_gestionar',
+    'plantillas_gestionar',
+    'auditoria_ver',
+    'usuarios_gestionar',
+  ],
+  director_tecnico: [
+    'reportes_crear',
+    'reportes_revisar',
+    'reportes_aprobar_emitir',
+    'reportes_anular',
+    'clientes_gestionar',
+    'patrones_gestionar',
+    'series_gestionar',
+    'plantillas_gestionar',
+    'auditoria_ver',
+  ],
+  revisor_tecnico: [
+    'reportes_crear',
+    'reportes_revisar',
+    'clientes_gestionar',
+    'patrones_gestionar',
+  ],
+  tecnico: [
+    'reportes_crear',
+    'clientes_gestionar',
+    'patrones_gestionar',
+  ],
+  auditor: [
+    'auditoria_ver',
+  ],
+};
+
 export const USUARIOS_INICIALES: Usuario[] = [
   {
     id: 'usr-1',
@@ -24,6 +129,8 @@ export const USUARIOS_INICIALES: Usuario[] = [
     cargo: 'Técnico de Ensayos y Metrología',
     rol: 'tecnico',
     firmaUrl: 'https://placehold.co/200x80/png?text=Firma+Carlos+M.',
+    activo: true,
+    password: 'Tecnico2026*',
   },
   {
     id: 'usr-2',
@@ -32,6 +139,8 @@ export const USUARIOS_INICIALES: Usuario[] = [
     cargo: 'Revisora de Aseguramiento Técnico',
     rol: 'revisor_tecnico',
     firmaUrl: 'https://placehold.co/200x80/png?text=Firma+Diana+G.',
+    activo: true,
+    password: 'Revisor2026*',
   },
   {
     id: 'usr-3',
@@ -40,6 +149,8 @@ export const USUARIOS_INICIALES: Usuario[] = [
     cargo: 'Director Técnico de Laboratorio',
     rol: 'director_tecnico',
     firmaUrl: 'https://placehold.co/200x80/png?text=Firma+Roberto+S.+DirTec',
+    activo: true,
+    password: 'Director2026*',
   },
   {
     id: 'usr-4',
@@ -47,6 +158,8 @@ export const USUARIOS_INICIALES: Usuario[] = [
     email: 'admin@empresa.com',
     cargo: 'Administrador del Sistema',
     rol: 'administrador',
+    activo: true,
+    password: 'Admin2026*',
   },
   {
     id: 'usr-5',
@@ -54,6 +167,8 @@ export const USUARIOS_INICIALES: Usuario[] = [
     email: 'auditor@empresa.com',
     cargo: 'Auditor Interno de Calidad',
     rol: 'auditor',
+    activo: true,
+    password: 'Auditor2026*',
   },
 ];
 
