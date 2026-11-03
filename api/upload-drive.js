@@ -7,7 +7,17 @@ const FOLDER_ID = '1lM9S94X9RXKMMO0f9izpBJlsMeiBmcYm';
 function getServiceAccount() {
   if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     try {
-      return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+      const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY.trim();
+      let creds;
+      if (raw.startsWith('{')) {
+        creds = JSON.parse(raw);
+      } else {
+        creds = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+      }
+      if (creds && creds.private_key) {
+        creds.private_key = creds.private_key.replace(/\\n/g, '\n');
+      }
+      return creds;
     } catch (e) {
       console.error('Error parseando GOOGLE_SERVICE_ACCOUNT_KEY:', e);
     }
@@ -17,7 +27,11 @@ function getServiceAccount() {
     const files = fs.readdirSync(process.cwd());
     const keyFile = files.find((f) => f.startsWith('certificados-app-') && f.endsWith('.json'));
     if (keyFile) {
-      return JSON.parse(fs.readFileSync(path.join(process.cwd(), keyFile), 'utf8'));
+      const creds = JSON.parse(fs.readFileSync(path.join(process.cwd(), keyFile), 'utf8'));
+      if (creds && creds.private_key) {
+        creds.private_key = creds.private_key.replace(/\\n/g, '\n');
+      }
+      return creds;
     }
   } catch (e) {
     console.error('Error buscando archivo local de credenciales:', e);
@@ -61,7 +75,6 @@ async function getAccessToken(creds) {
 }
 
 export default async function handler(req, res) {
-  // Configurar CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
