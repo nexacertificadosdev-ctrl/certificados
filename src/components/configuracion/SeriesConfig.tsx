@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { SerieConsecutiva, Usuario, CodigoClasificacion } from '../../types';
 import { storageService } from '../../services/storageService';
 import { driveService } from '../../services/driveService';
+import type { ArchivoDriveItem } from '../../services/driveService';
 import { 
   Settings, 
   ShieldCheck, 
@@ -14,7 +15,8 @@ import {
   ArrowRight,
   Sparkles,
   CheckCircle2,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
 interface SeriesConfigProps {
@@ -22,10 +24,13 @@ interface SeriesConfigProps {
 }
 
 interface CertificadoDetectado {
-  archivo: File;
+  archivo?: File;
   nombre: string;
   consecutivoDetectado: number | null;
   codigoClasificacion: CodigoClasificacion;
+  driveUrl?: string;
+  driveId?: string;
+  origen: 'local' | 'drive';
 }
 
 export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => {
@@ -41,7 +46,9 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
   const [calibracionExito, setCalibracionExito] = useState<string | null>(null);
   const [registrarEnLista, setRegistrarEnLista] = useState(true);
   const [subiendoADrive, setSubiendoADrive] = useState(false);
+  const [cargandoDrive, setCargandoDrive] = useState(false);
   const [progresoSubida, setProgresoSubida] = useState<string | null>(null);
+  const [notificacionDrive, setNotificacionDrive] = useState<string | null>(null);
 
   const esAdmin = usuarioActual.rol === 'administrador';
 
@@ -67,17 +74,37 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
     setTimeout(() => setGuardadoMsg(null), 3500);
   };
 
+  // Detector de clasificación según texto en el nombre del archivo
+  const detectarClasificacionDeNombre = (
+    nombreArchivo: string,
+    fallback: CodigoClasificacion
+  ): CodigoClasificacion => {
+    const norm = nombreArchivo.toUpperCase();
+    if (norm.includes('TUBERIA') || norm.includes('SPOOL') || norm.includes('-TB-') || norm.includes('TB')) return 'TB';
+    if (norm.includes('VALVULA') || norm.includes('PSV') || norm.includes('-VT-') || norm.includes('VT')) return 'VT';
+    if (norm.includes('PRESION') || norm.includes('MANOMETRO') || norm.includes('-PR-') || norm.includes('PR')) return 'PR';
+    if (norm.includes('TEMPERATURA') || norm.includes('TERMOMETRO') || norm.includes('-TM-') || norm.includes('TM')) return 'TM';
+    if (norm.includes('ELECTRICA') || norm.includes('VOLTAJE') || norm.includes('-EL-') || norm.includes('EL')) return 'EL';
+    return fallback;
+  };
+
   // Analizador inteligente de nombres de archivos PDF
   const extraerConsecutivoDeNombre = (nombreArchivo: string): number | null => {
     const nombreLimpio = nombreArchivo.replace(/\.pdf$/i, '');
     
-    // Intento 1: Formato estándar [PREFIJO]-[CODIGO]-[AÑO]-[NUMERO] -> toma el último bloque numérico
-    const partes = nombreLimpio.split(/[-_/\s]+/);
+    // Intento 1: Patrón SP-1, VT-35, 0045, etc.
+    const matchSp = nombreLimpio.match(/(?:SP|TB|VT|PR|TM|EL|CERT|TEST)[-_ ]*(\d+)/i);
+    if (matchSp) {
+      const num = parseInt(matchSp[1], 10);
+      if (!(num >= 2020 && num <= 2030)) return num;
+    }
+
+    // Intento 2: Buscar bloques numéricos divididos por guiones/espacios
+    const partes = nombreLimpio.split(/[-_/\s()]+/);
     for (let i = partes.length - 1; i >= 0; i--) {
       const parte = partes[i];
       if (/^\d+$/.test(parte)) {
         const num = parseInt(parte, 10);
-        // Descartar si parece un año reciente (2020 a 2030) a menos que sea el único
         if (num >= 2020 && num <= 2030 && partes.length > 1) {
           continue;
         }
@@ -85,26 +112,70 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
       }
     }
 
-    // Intento 2: Buscar secuencias de dígitos al final de la cadena
-    const matchFinal = nombreLimpio.match(/(\d+)$/);
+    // Intento 3: Secuencia final de dígitos
+    const matchFinal = nombreLimpio.match(/(\d+)(?:\D*)$/);
     if (matchFinal) {
-      return parseInt(matchFinal[1], 10);
-    }
-
-    // Intento 3: Cualquier número en el nombre
-    const matchCualquiera = nombreLimpio.match(/\d+/g);
-    if (matchCualquiera && matchCualquiera.length > 0) {
-      const posibles = matchCualquiera
-        .map((n) => parseInt(n, 10))
-        .filter((n) => !(n >= 2020 && n <= 2030));
-      if (posibles.length > 0) {
-        return Math.max(...posibles);
-      }
-      return parseInt(matchCualquiera[matchCualquiera.length - 1], 10);
+      const num = parseInt(matchFinal[1], 10);
+      if (!(num >= 2020 && num <= 2030)) return num;
     }
 
     return null;
   };
+
+  // Sincronización directa desde Google Drive (lee los archivos que el usuario ya subió a la carpeta)
+  const handleSincronizarDriveDirecto = async () => {
+    setCargandoDrive(true);
+    setNotificacionDrive(null);
+    try {
+      const res = await driveService.listarArchivosDrive();
+      if (!res.success || !res.files) {
+        setNotificacionDrive(`No se pudieron listar los archivos de Google Drive: ${res.error || 'Error de conexión'}`);
+        setCargandoDrive(false);
+        return;
+      }
+
+      if (res.files.length === 0) {
+        setNotificacionDrive('La carpeta de Google Drive está vacía o no tiene archivos PDF aún.');
+        setCargandoDrive(false);
+        return;
+      }
+
+      const detectados: CertificadoDetectado[] = res.files.map((f: ArchivoDriveItem) => {
+        const clasif = detectarClasificacionDeNombre(f.name, clasificacionSeleccionada);
+        const consecutivo = extraerConsecutivoDeNombre(f.name);
+        return {
+          nombre: f.name,
+          consecutivoDetectado: consecutivo,
+          codigoClasificacion: clasif,
+          driveUrl: f.webViewLink,
+          driveId: f.id,
+          origen: 'drive',
+        };
+      });
+
+      setArchivosAnalizados(detectados);
+
+      // Si se detectó alguna clasificación específica, actualizar el selector
+      const clasifsEncontradas = detectados.map((d) => d.codigoClasificacion);
+      if (clasifsEncontradas.includes('TB')) {
+        setClasificacionSeleccionada('TB');
+      } else if (clasifsEncontradas.length > 0) {
+        setClasificacionSeleccionada(clasifsEncontradas[0]);
+      }
+
+      setNotificacionDrive(`Se encontraron ${detectados.length} archivo(s) en tu carpeta de Google Drive.`);
+      setTimeout(() => setNotificacionDrive(null), 5000);
+    } catch (err: any) {
+      setNotificacionDrive(`Error al consultar Google Drive: ${err.message}`);
+    } finally {
+      setCargandoDrive(false);
+    }
+  };
+
+  // Cargar automáticamente archivos de Google Drive al montar
+  useEffect(() => {
+    handleSincronizarDriveDirecto();
+  }, []);
 
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -117,13 +188,19 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
         nombre: file.name,
         consecutivoDetectado: consecutivo,
         codigoClasificacion: clasificacionSeleccionada,
+        origen: 'local',
       };
     });
 
     setArchivosAnalizados(resultados);
   };
 
-  const maxConsecutivoDetectado = archivosAnalizados.reduce((max, item) => {
+  // Filtrar archivos correspondientes a la clasificación actualmente seleccionada
+  const archivosFiltradosPorClasificacion = archivosAnalizados.filter(
+    (item) => item.codigoClasificacion === clasificacionSeleccionada
+  );
+
+  const maxConsecutivoDetectado = archivosFiltradosPorClasificacion.reduce((max, item) => {
     if (item.consecutivoDetectado !== null && item.consecutivoDetectado > max) {
       return item.consecutivoDetectado;
     }
@@ -143,21 +220,26 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
     // 2. Si se eligió registrar en la lista de reportes para consulta
     if (registrarEnLista) {
       setSubiendoADrive(true);
-      for (let i = 0; i < archivosAnalizados.length; i++) {
-        const item = archivosAnalizados[i];
-        setProgresoSubida(`Subiendo a Google Drive (${i + 1}/${archivosAnalizados.length}): ${item.nombre}`);
+      for (let i = 0; i < archivosFiltradosPorClasificacion.length; i++) {
+        const item = archivosFiltradosPorClasificacion[i];
+        let driveUrl = item.driveUrl || driveConfig.folderUrl;
 
-        let driveUrl = driveConfig.folderUrl;
-        try {
-          const res = await driveService.subirArchivo(item.archivo, item.nombre);
-          if (res.success && res.webViewLink) {
-            driveUrl = res.webViewLink;
+        // Si es archivo local y aún no está en Drive, subirlo
+        if (item.origen === 'local' && item.archivo) {
+          setProgresoSubida(`Subiendo a Google Drive (${i + 1}/${archivosFiltradosPorClasificacion.length}): ${item.nombre}`);
+          try {
+            const res = await driveService.subirArchivo(item.archivo, item.nombre);
+            if (res.success && res.webViewLink) {
+              driveUrl = res.webViewLink;
+            }
+          } catch (e) {
+            console.warn('Subida directa en background no completada, enlazando a carpeta:', e);
           }
-        } catch (e) {
-          console.warn('Subida directa en background no completada, enlazando a carpeta:', e);
         }
 
-        const serieActual = series.find((s) => s.clasificacionCodigo === clasificacionSeleccionada);
+        const serieActual = series.find(
+          (s) => s.clasificacionCodigo === clasificacionSeleccionada || s.id === `ser-${clasificacionSeleccionada.toLowerCase()}`
+        );
         const prefijo = serieActual?.prefijo || 'TEST';
         const numStr = item.consecutivoDetectado
           ? String(item.consecutivoDetectado).padStart(serieActual?.longitudDigitos || 4, '0')
@@ -183,7 +265,6 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
     setCalibracionExito(
       `¡Serie [${clasificacionSeleccionada}] calibrada con éxito! Último número ajustado a ${maxConsecutivoDetectado}. El próximo certificado generado será el #${maxConsecutivoDetectado + 1}.`
     );
-    setArchivosAnalizados([]);
     setTimeout(() => setCalibracionExito(null), 6000);
   };
 
@@ -240,16 +321,38 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
             </div>
           </div>
 
-          <a
-            href={driveConfig.folderUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-emerald-50 text-emerald-700 font-medium rounded-lg border border-emerald-300 shadow-xs text-xs transition-colors self-stretch sm:self-auto justify-center"
-          >
-            <span>Abrir Carpeta en Google Drive</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+            <button
+              onClick={handleSincronizarDriveDirecto}
+              disabled={cargandoDrive}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 text-white font-medium rounded-lg shadow-sm text-xs transition-colors cursor-pointer"
+            >
+              {cargandoDrive ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              <span>Sincronizar Archivos de Google Drive</span>
+            </button>
+
+            <a
+              href={driveConfig.folderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-emerald-50 text-emerald-700 font-medium rounded-lg border border-emerald-300 shadow-xs text-xs transition-colors justify-center"
+            >
+              <span>Abrir Carpeta en Google Drive</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
         </div>
+
+        {notificacionDrive && (
+          <div className="mt-4 p-3 bg-white/80 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{notificacionDrive}</span>
+          </div>
+        )}
       </div>
 
       {/* SECCION 1: SUBIDA Y DETECCION DE HISTORICOS PARA CALIBRAR CONSECUTIVOS */}
@@ -261,7 +364,7 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
               Calibración Automática de Consecutivos desde Certificados Anteriores (PDF)
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Selecciona la clasificación técnica y arrastra tus PDFs anteriores (subidos a tu Google Drive). El sistema analiza los nombres de archivo, detecta el último número consecutivo emitido y ajusta la serie automáticamente para que la plataforma continúe la secuencia correcta.
+              Selecciona la clasificación técnica o sincroniza con tu Google Drive. El sistema analiza los nombres de archivo, detecta el último número consecutivo emitido y ajusta la serie automáticamente para que la plataforma continúe la secuencia correcta.
             </p>
           </div>
         </div>
@@ -293,15 +396,15 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
 
           <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-              2. Subir o Arrastrar Certificados Anteriores (Archivos .PDF)
+              2. Subir Archivos Locales o Leer de Google Drive
             </label>
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/70 rounded-xl p-4 cursor-pointer transition-all">
               <UploadCloud className="w-8 h-8 text-indigo-500 mb-1" />
               <span className="text-xs font-medium text-indigo-900">
-                Haz clic para seleccionar o arrastra tus archivos PDF aquí
+                Haz clic para seleccionar archivos PDF locales, o haz clic en "Sincronizar Archivos de Google Drive" arriba
               </span>
               <span className="text-[11px] text-slate-500 mt-0.5">
-                (Formatos soportados: TEST-VT-2026-0035.pdf, VT-0042.pdf, Certificado_50.pdf, etc.)
+                (Formatos soportados: TEST-SP-1 (TUBERIA).pdf, TEST-VT-2026-0035.pdf, VT-0042.pdf, etc.)
               </span>
               <input
                 type="file"
@@ -315,12 +418,12 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
         </div>
 
         {/* Listado de archivos analizados */}
-        {archivosAnalizados.length > 0 && (
+        {archivosFiltradosPorClasificacion.length > 0 && (
           <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Archivos Analizados: {archivosAnalizados.length}
+                  Archivos Detectados para [{clasificacionSeleccionada}]: {archivosFiltradosPorClasificacion.length}
                 </span>
                 <p className="text-sm font-semibold text-slate-900 mt-0.5">
                   Último número consecutivo detectado:{' '}
@@ -330,7 +433,7 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
                 </p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -338,23 +441,23 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
                     onChange={(e) => setRegistrarEnLista(e.target.checked)}
                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span>Subir archivos y registrar en historial de Drive</span>
+                  <span>Registrar en historial con enlace a Drive</span>
                 </label>
 
                 <button
                   onClick={handleAplicarCalibracion}
                   disabled={maxConsecutivoDetectado <= 0 || subiendoADrive}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg text-sm shadow-sm transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg text-sm shadow-sm transition-all cursor-pointer"
                 >
                   {subiendoADrive ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{progresoSubida || 'Subiendo a Google Drive...'}</span>
+                      <span>{progresoSubida || 'Procesando...'}</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>Calibrar Serie a #{maxConsecutivoDetectado}</span>
+                      <span>Calibrar Serie [{clasificacionSeleccionada}] a #{maxConsecutivoDetectado}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -363,14 +466,27 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
             </div>
 
             <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
-              {archivosAnalizados.map((item, idx) => (
+              {archivosFiltradosPorClasificacion.map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between p-3 text-xs hover:bg-slate-50">
                   <div className="flex items-center gap-2.5 truncate">
                     <FileText className="w-4 h-4 text-rose-500 flex-shrink-0" />
                     <span className="font-mono text-slate-800 truncate">{item.nombre}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 border border-slate-200 uppercase font-semibold">
+                      {item.origen === 'drive' ? 'En Google Drive' : 'Local'}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-slate-400">{(item.archivo.size / 1024).toFixed(1)} KB</span>
+                    {item.driveUrl && (
+                      <a
+                        href={item.driveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:underline flex items-center gap-1 text-[11px]"
+                      >
+                        <span>Ver en Drive</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                     {item.consecutivoDetectado !== null ? (
                       <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-mono font-bold">
                         Consecutivo: #{item.consecutivoDetectado}
@@ -393,7 +509,7 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-lg font-bold text-slate-900">Parámetros Operativos de Numeración por Serie</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Visualiza y edita los prefijos, año fiscal activo, longitud de relleno de ceros y último consecutivo generado.
+            Visualiza y edita los prefijos, códigos técnicos, año fiscal activo, longitud de relleno de ceros y último consecutivo generado.
           </p>
         </div>
 

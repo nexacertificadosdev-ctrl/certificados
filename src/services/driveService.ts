@@ -1,3 +1,13 @@
+export interface ArchivoDriveItem {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string;
+  webViewLink?: string;
+  createdTime?: string;
+  modifiedTime?: string;
+}
+
 export interface UploadDriveResult {
   success: boolean;
   fileId?: string;
@@ -7,6 +17,35 @@ export interface UploadDriveResult {
 }
 
 export const driveService = {
+  /**
+   * Consulta los archivos que ya se encuentran dentro de la carpeta de Google Drive
+   */
+  async listarArchivosDrive(): Promise<{ success: boolean; files: ArchivoDriveItem[]; error?: string }> {
+    try {
+      const response = await fetch('/api/list-drive');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          files: [],
+          error: errorData.error || `HTTP ${response.status}`,
+        };
+      }
+      const data = await response.json();
+      return {
+        success: true,
+        files: data.files || [],
+      };
+    } catch (err: any) {
+      console.warn('[driveService] Error listando archivos de Drive:', err);
+      return {
+        success: false,
+        files: [],
+        error: err.message || 'Error de red al consultar Google Drive',
+      };
+    }
+  },
+
   /**
    * Sube un archivo PDF a la carpeta de Google Drive configurada
    */
