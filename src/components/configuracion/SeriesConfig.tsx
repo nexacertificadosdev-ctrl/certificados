@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { SerieConsecutiva, Usuario, CodigoClasificacion } from '../../types';
 import { storageService } from '../../services/storageService';
+import { driveService } from '../../services/driveService';
 import { 
   Settings, 
   ShieldCheck, 
@@ -12,7 +13,8 @@ import {
   FolderSync, 
   ArrowRight,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 
 interface SeriesConfigProps {
@@ -38,6 +40,8 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
   const [archivosAnalizados, setArchivosAnalizados] = useState<CertificadoDetectado[]>([]);
   const [calibracionExito, setCalibracionExito] = useState<string | null>(null);
   const [registrarEnLista, setRegistrarEnLista] = useState(true);
+  const [subiendoADrive, setSubiendoADrive] = useState(false);
+  const [progresoSubida, setProgresoSubida] = useState<string | null>(null);
 
   const esAdmin = usuarioActual.rol === 'administrador';
 
@@ -126,7 +130,7 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
     return max;
   }, 0);
 
-  const handleAplicarCalibracion = () => {
+  const handleAplicarCalibracion = async () => {
     if (maxConsecutivoDetectado <= 0) return;
 
     // 1. Calibrar serie
@@ -138,7 +142,21 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
 
     // 2. Si se eligió registrar en la lista de reportes para consulta
     if (registrarEnLista) {
-      archivosAnalizados.forEach((item) => {
+      setSubiendoADrive(true);
+      for (let i = 0; i < archivosAnalizados.length; i++) {
+        const item = archivosAnalizados[i];
+        setProgresoSubida(`Subiendo a Google Drive (${i + 1}/${archivosAnalizados.length}): ${item.nombre}`);
+
+        let driveUrl = driveConfig.folderUrl;
+        try {
+          const res = await driveService.subirArchivo(item.archivo, item.nombre);
+          if (res.success && res.webViewLink) {
+            driveUrl = res.webViewLink;
+          }
+        } catch (e) {
+          console.warn('Subida directa en background no completada, enlazando a carpeta:', e);
+        }
+
         const serieActual = series.find((s) => s.clasificacionCodigo === clasificacionSeleccionada);
         const prefijo = serieActual?.prefijo || 'TEST';
         const numStr = item.consecutivoDetectado
@@ -151,11 +169,13 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
             numeroConsecutivo: consecutivoFinal,
             clasificacionCodigo: clasificacionSeleccionada,
             nombreArchivo: item.nombre,
-            googleDriveUrl: driveConfig.folderUrl,
+            googleDriveUrl: driveUrl,
           },
           usuarioActual
         );
-      });
+      }
+      setSubiendoADrive(false);
+      setProgresoSubida(null);
     }
 
     // Refrescar series en estado
@@ -318,17 +338,26 @@ export const SeriesConfig: React.FC<SeriesConfigProps> = ({ usuarioActual }) => 
                     onChange={(e) => setRegistrarEnLista(e.target.checked)}
                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span>Registrar en historial con enlace a Drive</span>
+                  <span>Subir archivos y registrar en historial de Drive</span>
                 </label>
 
                 <button
                   onClick={handleAplicarCalibracion}
-                  disabled={maxConsecutivoDetectado <= 0}
+                  disabled={maxConsecutivoDetectado <= 0 || subiendoADrive}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg text-sm shadow-sm transition-all"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Calibrar Serie a #{maxConsecutivoDetectado}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {subiendoADrive ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{progresoSubida || 'Subiendo a Google Drive...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>Calibrar Serie a #{maxConsecutivoDetectado}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
