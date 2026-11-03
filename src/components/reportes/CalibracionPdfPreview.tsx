@@ -93,7 +93,7 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
       {/* DOCUMENTO (2 PÁGINAS) */}
       <div className="max-w-[850px] mx-auto space-y-8 print:space-y-0 print:w-full print:max-w-none print:block">
         {/* PÁGINA 1: DATOS DEL INSTRUMENTO Y PATRONES */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0 page-break">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none page-break print-page">
           {/* Encabezado con Doble Logo y Color Secundario */}
           <div
             className="border-2 p-3 mb-4 rounded-xs"
@@ -289,7 +289,7 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
         </div>
 
         {/* PÁGINA 2: RESULTADOS METROLÓGICOS, INCERTIDUMBRE Y FIRMAS */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print-page-last">
           <div
             className="flex justify-between items-center border-b-2 pb-2 mb-4 text-[10px] text-slate-600"
             style={{ borderColor: colorSecundario }}

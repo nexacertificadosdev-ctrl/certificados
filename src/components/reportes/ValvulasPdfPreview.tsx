@@ -105,7 +105,7 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
         {/* ========================================================= */}
         {/* PÁGINA 1: DATOS GENERALES, AMBIENTALES Y TRAZABILIDAD */}
         {/* ========================================================= */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0 page-break">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none page-break print-page">
           {/* Encabezado Institucional con Doble Logo y Colores */}
           <div
             className="border-2 p-3 mb-4 rounded-xs"
@@ -371,7 +371,7 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
         {/* ========================================================= */}
         {/* PÁGINA 2: RESULTADOS TÉCNICOS, CRITERIOS Y GRÁFICAS */}
         {/* ========================================================= */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0 page-break">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none page-break print-page">
           {/* Subencabezado Página 2 */}
           <div
             className="flex justify-between items-center border-b-2 pb-2 mb-4 text-[10px] text-slate-600"
@@ -570,7 +570,7 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
         {/* ========================================================= */}
         {/* PÁGINA 3: OBSERVACIONES, DECLARACIONES Y FIRMAS */}
         {/* ========================================================= */}
-        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print:p-0 print:m-0">
+        <div className="bg-white p-10 shadow-lg rounded-sm border border-slate-300 print:shadow-none print:border-none print-page-last">
           {/* Subencabezado Página 3 */}
           <div
             className="flex justify-between items-center border-b-2 pb-2 mb-4 text-[10px] text-slate-600"
