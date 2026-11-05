@@ -5,10 +5,12 @@ import type {
   EquipoInstrumento,
   ReporteCertificado,
   Usuario,
+  GraficaServicio,
 } from '../../types';
 import { storageService } from '../../services/storageService';
 import { Save, Send, ArrowLeft, AlertCircle, CheckCircle, Calculator } from 'lucide-react';
 import { PatronesSelector } from './PatronesSelector';
+import { GraficasServicioUploader } from '../common/GraficasServicioUploader';
 
 interface ValvulasFormProps {
   reporteInicial?: ReporteCertificado;
@@ -74,6 +76,9 @@ export const ValvulasForm: React.FC<ValvulasFormProps> = ({
   );
   const [fechaPrueba, setFechaPrueba] = useState(
     reporteInicial?.fechaPrueba || new Date().toISOString().split('T')[0]
+  );
+  const [graficasServicio, setGraficasServicio] = useState<GraficaServicio[]>(
+    reporteInicial?.graficasServicio || []
   );
 
   // Datos específicos de válvula
@@ -230,6 +235,7 @@ export const ValvulasForm: React.FC<ValvulasFormProps> = ({
           fechaRecepcion,
           fechaPrueba,
           datosValvula: datosFinales,
+          graficasServicio,
         },
         usuarioActual
       );
@@ -266,6 +272,7 @@ export const ValvulasForm: React.FC<ValvulasFormProps> = ({
           fechaRecepcion,
           fechaPrueba,
           datosValvula: datosFinales,
+          graficasServicio,
         },
         usuarioActual
       );
@@ -928,6 +935,19 @@ export const ValvulasForm: React.FC<ValvulasFormProps> = ({
             </div>
           </div>
         </div>
+
+        {/* BLOQUE: REPRESENTACIÓN GRÁFICA DEL SERVICIO */}
+        <GraficasServicioUploader
+          graficas={graficasServicio}
+          onChange={setGraficasServicio}
+          titulosSugeridos={
+            plantillaSeleccionada?.textosSecciones?.titulosGraficasPorDefecto || [
+              'Prueba de Sello / Disparo - Entrada',
+              'Prueba de Sello / Disparo - Salida',
+            ]
+          }
+          maxGraficas={4}
+        />
 
         {/* BLOQUE 5: OBSERVACIONES Y DECLARACIONES */}
         <div className="bg-white p-6 rounded-xl shadow-xs border border-slate-200">

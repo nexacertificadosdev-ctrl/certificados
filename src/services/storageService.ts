@@ -7,6 +7,7 @@ import type {
   PlantillaDocumental,
   RegistroAuditoria,
   ReporteCertificado,
+  GraficaServicio,
   SerieConsecutiva,
   Usuario,
   EquipoPatron,
@@ -60,6 +61,37 @@ class StorageService {
     }
   }
 
+  private graficasCache: Map<string, GraficaServicio[]> = new Map();
+
+  public getGraficasDeReporte(id: string): GraficaServicio[] | undefined {
+    if (this.graficasCache.has(id)) {
+      return this.graficasCache.get(id);
+    }
+    try {
+      const raw = sessionStorage.getItem(`cert_graficas_${id}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        this.graficasCache.set(id, parsed);
+        return parsed;
+      }
+    } catch {}
+    return undefined;
+  }
+
+  public setGraficasDeReporte(id: string, graficas?: GraficaServicio[]): void {
+    if (!graficas || graficas.length === 0) {
+      this.graficasCache.delete(id);
+      try { sessionStorage.removeItem(`cert_graficas_${id}`); } catch {}
+      return;
+    }
+    this.graficasCache.set(id, graficas);
+    try {
+      sessionStorage.setItem(`cert_graficas_${id}`, JSON.stringify(graficas));
+    } catch (e) {
+      console.warn('[storageService] No se pudo guardar en sessionStorage:', e);
+    }
+  }
+
   private set<T>(key: string, value: T): void {
     try {
       localStorage.setItem(key, JSON.stringify(value));
@@ -67,7 +99,7 @@ class StorageService {
       console.warn(`[storageService] Exceso de cuota o error al guardar '${key}':`, e);
       if (key === STORAGE_KEYS.PLANTILLAS && Array.isArray(value)) {
         try {
-          // Si el array de 12 plantillas excede la cuota de 5MB por duplicación de base64,
+          // Si el array de plantillas excede la cuota de 5MB por duplicación de base64,
           // guardamos una versión optimizada donde las plantillas heredan de CONFIG_GLOBAL.
           const plantillasLigeras = (value as PlantillaDocumental[]).map((p) => ({
             ...p,
@@ -78,6 +110,20 @@ class StorageService {
           console.info('[storageService] Plantillas guardadas en formato ligero con herencia de logos globales.');
         } catch (err2) {
           console.error('[storageService] Error persistente al guardar plantillas ligeras:', err2);
+        }
+      }
+      if (key === STORAGE_KEYS.REPORTES && Array.isArray(value)) {
+        try {
+          // Si el array de reportes excede cuota por imágenes base64 de gráficas,
+          // omitimos graficasServicio de localStorage (se conservan en memoria/sessionStorage)
+          const reportesLigeros = (value as ReporteCertificado[]).map((r) => {
+            const { graficasServicio, ...resto } = r;
+            return resto;
+          });
+          localStorage.setItem(key, JSON.stringify(reportesLigeros));
+          console.info('[storageService] Reportes guardados en localStorage sin imágenes pesadas de gráficas.');
+        } catch (err3) {
+          console.error('[storageService] Error persistente al guardar reportes ligeros:', err3);
         }
       }
     }
@@ -785,6 +831,7 @@ class StorageService {
       colorPrimario: r.colorPrimario || DEFAULT_COLOR_PRIMARIO,
       colorSecundario: r.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
       colorTextoEncabezado: r.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
+      graficasServicio: r.graficasServicio || this.getGraficasDeReporte(r.id) || (r.tempId ? this.getGraficasDeReporte(r.tempId) : undefined),
     }));
   }
 
@@ -834,6 +881,10 @@ class StorageService {
       fechaPrueba: reporteData.fechaPrueba || new Date().toISOString().split('T')[0],
       creadoPor: usuario,
       datosValvula: reporteData.datosValvula,
+      datosTuberia: reporteData.datosTuberia,
+      datosCalibracion: reporteData.datosCalibracion,
+      graficasServicio: reporteData.graficasServicio,
+      fechaFormato: reporteData.fechaFormato || plantillaElegida.fechaFormato,
       transiciones: [
         {
           id: `tr-${Date.now()}`,
@@ -849,6 +900,11 @@ class StorageService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
+    if (reporteData.graficasServicio && reporteData.graficasServicio.length > 0) {
+      this.setGraficasDeReporte(nuevoId, reporteData.graficasServicio);
+      this.setGraficasDeReporte(tempId, reporteData.graficasServicio);
+    }
 
     reportes.unshift(nuevoReporte);
     this.set(STORAGE_KEYS.REPORTES, reportes);
@@ -886,6 +942,13 @@ class StorageService {
       ...cambios,
       updatedAt: new Date().toISOString(),
     };
+
+    if (cambios.graficasServicio) {
+      this.setGraficasDeReporte(reporteId, cambios.graficasServicio);
+      if (actual.tempId) {
+        this.setGraficasDeReporte(actual.tempId, cambios.graficasServicio);
+      }
+    }
 
     reportes[index] = reporteActualizado;
     this.set(STORAGE_KEYS.REPORTES, reportes);

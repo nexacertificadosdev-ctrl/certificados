@@ -346,35 +346,72 @@ export const TuberiaPdfPreview: React.FC<TuberiaPdfPreviewProps> = ({ reporte, o
             >
               4. Gráfica de Presión y Temperatura Durante el Sostenimiento
             </div>
-            <div className="border border-slate-300 p-3 bg-white text-center">
-              <svg viewBox="0 0 600 200" className="w-full h-44 bg-slate-50 border border-slate-200">
-                <line x1="40" y1="20" x2="580" y2="20" stroke="#e2e8f0" strokeDasharray="3" />
-                <line x1="40" y1="70" x2="580" y2="70" stroke="#e2e8f0" strokeDasharray="3" />
-                <line x1="40" y1="120" x2="580" y2="120" stroke="#e2e8f0" strokeDasharray="3" />
-                <line x1="40" y1="170" x2="580" y2="170" stroke="#94a3b8" />
-                <line x1="40" y1="20" x2="40" y2="170" stroke="#94a3b8" />
+            {reporte.graficasServicio && reporte.graficasServicio.filter((g) => g.imagenUrl).length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {reporte.graficasServicio
+                  .filter((g) => g.imagenUrl)
+                  .map((g, idx) => (
+                    <div
+                      key={g.id || idx}
+                      className="border-2 rounded bg-white overflow-hidden flex flex-col shadow-xs"
+                      style={{ borderColor: colorSecundario }}
+                    >
+                      <div
+                        className="px-2 py-1 text-center font-bold text-[10px] uppercase tracking-wide border-b"
+                        style={{
+                          backgroundColor: `${colorSecundario}12`,
+                          color: colorSecundario,
+                          borderColor: `${colorSecundario}30`,
+                        }}
+                      >
+                        {g.titulo || `Gráfica de Ensayo #${idx + 1}`}
+                      </div>
+                      <div className="p-2 flex items-center justify-center bg-white min-h-[140px] max-h-[180px] overflow-hidden">
+                        <img
+                          src={g.imagenUrl}
+                          alt={g.titulo}
+                          className="max-h-40 max-w-full object-contain"
+                        />
+                      </div>
+                      {g.pieGrafica && (
+                        <div className="text-[8px] text-slate-500 text-center py-0.5 px-1 bg-slate-50 border-t border-slate-200 italic">
+                          {g.pieGrafica}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="border border-slate-300 p-3 bg-white text-center">
+                <svg viewBox="0 0 600 200" className="w-full h-44 bg-slate-50 border border-slate-200">
+                  <line x1="40" y1="20" x2="580" y2="20" stroke="#e2e8f0" strokeDasharray="3" />
+                  <line x1="40" y1="70" x2="580" y2="70" stroke="#e2e8f0" strokeDasharray="3" />
+                  <line x1="40" y1="120" x2="580" y2="120" stroke="#e2e8f0" strokeDasharray="3" />
+                  <line x1="40" y1="170" x2="580" y2="170" stroke="#94a3b8" />
+                  <line x1="40" y1="20" x2="40" y2="170" stroke="#94a3b8" />
 
-                <text x="35" y="24" fontSize="9" textAnchor="end" fill="#64748b">500 psi</text>
-                <text x="35" y="74" fontSize="9" textAnchor="end" fill="#64748b">450 psi</text>
-                <text x="35" y="124" fontSize="9" textAnchor="end" fill="#64748b">250 psi</text>
-                <text x="35" y="174" fontSize="9" textAnchor="end" fill="#64748b">0 psi</text>
-                <text x="310" y="190" fontSize="9" textAnchor="middle" fill="#64748b">Tiempo de Prueba: 60 minutos (Sostenimiento Estable)</text>
+                  <text x="35" y="24" fontSize="9" textAnchor="end" fill="#64748b">500 psi</text>
+                  <text x="35" y="74" fontSize="9" textAnchor="end" fill="#64748b">450 psi</text>
+                  <text x="35" y="124" fontSize="9" textAnchor="end" fill="#64748b">250 psi</text>
+                  <text x="35" y="174" fontSize="9" textAnchor="end" fill="#64748b">0 psi</text>
+                  <text x="310" y="190" fontSize="9" textAnchor="middle" fill="#64748b">Tiempo de Prueba: 60 minutos (Sostenimiento Estable)</text>
 
-                <line x1="40" y1="70" x2="580" y2="70" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4" />
-                <text x="540" y="65" fontSize="8" fill="#ef4444" fontWeight="bold">Presión: 450 psi</text>
+                  <line x1="40" y1="70" x2="580" y2="70" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4" />
+                  <text x="540" y="65" fontSize="8" fill="#ef4444" fontWeight="bold">Presión: 450 psi</text>
 
-                <path
-                  d="M 40,170 L 100,70 L 480,70 L 540,170"
-                  fill="none"
-                  stroke={colorSecundario}
-                  strokeWidth="2.5"
-                />
-                <circle cx="290" cy="70" r="4" fill={colorSecundario} />
-                <text x="290" y="60" fontSize="9" fill={colorSecundario} fontWeight="bold" textAnchor="middle">
-                  452.5 PSI sostenido sin caída (0 PSI)
-                </text>
-              </svg>
-            </div>
+                  <path
+                    d="M 40,170 L 100,70 L 480,70 L 540,170"
+                    fill="none"
+                    stroke={colorSecundario}
+                    strokeWidth="2.5"
+                  />
+                  <circle cx="290" cy="70" r="4" fill={colorSecundario} />
+                  <text x="290" y="60" fontSize="9" fill={colorSecundario} fontWeight="bold" textAnchor="middle">
+                    452.5 PSI sostenido sin caída (0 PSI)
+                  </text>
+                </svg>
+              </div>
+            )}
           </div>
 
           {/* Trazabilidad de Patrones */}

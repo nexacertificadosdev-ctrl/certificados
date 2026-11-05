@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import type { ReporteCertificado } from '../../types';
+import type { ReporteCertificado, PlantillaDocumental } from '../../types';
+import { storageService } from '../../services/storageService';
 import { Printer, ArrowLeft, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 import { generarQrVerificacion, generarHashIntegridad } from '../../utils/security';
 import {
@@ -19,6 +20,11 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
   const d = reporte.datosValvula;
   const numVisible = reporte.numeroConsecutivo || reporte.tempId;
   const esOficial = !!reporte.numeroConsecutivo;
+
+  const plantillas = storageService.getPlantillas();
+  const plantilla = plantillas.find((p: PlantillaDocumental) => p.id === reporte.plantillaId);
+  const textosSec = plantilla?.textosSecciones;
+  const fechaDoc = reporte.fechaFormato || plantilla?.fechaFormato || '24/03/2026';
 
   const colorPrimario = reporte.colorPrimario || DEFAULT_COLOR_PRIMARIO;
   const colorSecundario = reporte.colorSecundario || DEFAULT_COLOR_SECUNDARIO;
@@ -163,6 +169,12 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
                   style={{ color: colorSecundario }}
                 >
                   {numVisible}
+                </span>
+                <span className="text-[8px] font-mono text-slate-600 font-semibold block">
+                  {reporte.codigoFormato || 'FOR-PCC-274'} | {reporte.versionPlantilla || 'Vr: 01'}
+                </span>
+                <span className="text-[7.5px] font-mono text-slate-400 block">
+                  Fecha: {fechaDoc}
                 </span>
                 <span className="text-[8px] text-slate-400 block">Página 1 de 3</span>
               </div>
@@ -491,75 +503,112 @@ export const ValvulasPdfPreview: React.FC<ValvulasPdfPreviewProps> = ({ reporte,
               className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider mb-2"
               style={{ backgroundColor: colorPrimario, color: colorTexto }}
             >
-              6. Gráficas Registradas de Presión vs. Tiempo
+              {textosSec?.tituloGraficas || '6. Gráficas Registradas de Presión vs. Tiempo'}
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              {/* Gráfica 1: Entrada / Disparo */}
-              <div className="border border-slate-300 p-2 text-center bg-white">
-                <span className="text-[10px] font-bold text-slate-700 block mb-1">
-                  Curva de Disparo (Pop Test) - Ciclo Encontrado y Ajustado
-                </span>
-                <svg viewBox="0 0 320 160" className="w-full h-36 border border-slate-200 bg-slate-50">
-                  <line x1="30" y1="20" x2="310" y2="20" stroke="#e2e8f0" strokeDasharray="3" />
-                  <line x1="30" y1="50" x2="310" y2="50" stroke="#e2e8f0" strokeDasharray="3" />
-                  <line x1="30" y1="80" x2="310" y2="80" stroke="#e2e8f0" strokeDasharray="3" />
-                  <line x1="30" y1="110" x2="310" y2="110" stroke="#e2e8f0" strokeDasharray="3" />
-                  <line x1="30" y1="140" x2="310" y2="140" stroke="#94a3b8" />
-                  <line x1="30" y1="20" x2="30" y2="140" stroke="#94a3b8" />
-
-                  <text x="26" y="24" fontSize="8" textAnchor="end" fill="#64748b">200</text>
-                  <text x="26" y="54" fontSize="8" textAnchor="end" fill="#64748b">175</text>
-                  <text x="26" y="84" fontSize="8" textAnchor="end" fill="#64748b">150</text>
-                  <text x="26" y="114" fontSize="8" textAnchor="end" fill="#64748b">100</text>
-                  <text x="26" y="144" fontSize="8" textAnchor="end" fill="#64748b">0</text>
-                  <text x="170" y="155" fontSize="8" textAnchor="middle" fill="#64748b">Tiempo (seg)</text>
-
-                  <line x1="30" y1="50" x2="310" y2="50" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4" />
-                  <text x="290" y="46" fontSize="7" fill="#ef4444" fontWeight="bold">Set: 175 psi</text>
-
-                  <path
-                    d="M 30,140 Q 90,135 120,90 T 170,48 L 180,68 Q 210,50 240,49 L 260,70 L 300,138"
-                    fill="none"
-                    stroke={colorSecundario}
-                    strokeWidth="2"
-                  />
-                  <circle cx="170" cy="48" r="3" fill={colorSecundario} />
-                  <text x="170" y="40" fontSize="7" fill={colorSecundario} fontWeight="bold" textAnchor="middle">175.4 psi</text>
-                </svg>
-                <span className="text-[9px] text-slate-500 italic block mt-1">Medio: Nitrógeno | Sensor: PAT-PR-04</span>
+            {reporte.graficasServicio && reporte.graficasServicio.filter((g) => g.imagenUrl).length > 0 ? (
+              <div className="grid grid-cols-2 gap-4">
+                {reporte.graficasServicio
+                  .filter((g) => g.imagenUrl)
+                  .map((g, idx) => (
+                    <div
+                      key={g.id || idx}
+                      className="border-2 rounded bg-white overflow-hidden flex flex-col shadow-xs"
+                      style={{ borderColor: colorSecundario }}
+                    >
+                      <div
+                        className="px-2 py-1 text-center font-bold text-[10px] uppercase tracking-wide border-b"
+                        style={{
+                          backgroundColor: `${colorSecundario}12`,
+                          color: colorSecundario,
+                          borderColor: `${colorSecundario}30`,
+                        }}
+                      >
+                        {g.titulo || (idx === 0 ? 'Prueba de Sello / Disparo - Entrada' : 'Prueba de Sello / Disparo - Salida')}
+                      </div>
+                      <div className="p-2 flex items-center justify-center bg-white min-h-[140px] max-h-[175px] overflow-hidden">
+                        <img
+                          src={g.imagenUrl}
+                          alt={g.titulo}
+                          className="max-h-36 max-w-full object-contain"
+                        />
+                      </div>
+                      {g.pieGrafica && (
+                        <div className="text-[8px] text-slate-500 text-center py-0.5 px-1 bg-slate-50 border-t border-slate-200 italic">
+                          {g.pieGrafica}
+                        </div>
+                      )}
+                    </div>
+                  ))}
               </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Gráfica 1: Entrada / Disparo */}
+                <div className="border border-slate-300 p-2 text-center bg-white">
+                  <span className="text-[10px] font-bold text-slate-700 block mb-1">
+                    Curva de Disparo (Pop Test) - Entrada
+                  </span>
+                  <svg viewBox="0 0 320 160" className="w-full h-36 border border-slate-200 bg-slate-50">
+                    <line x1="30" y1="20" x2="310" y2="20" stroke="#e2e8f0" strokeDasharray="3" />
+                    <line x1="30" y1="50" x2="310" y2="50" stroke="#e2e8f0" strokeDasharray="3" />
+                    <line x1="30" y1="80" x2="310" y2="80" stroke="#e2e8f0" strokeDasharray="3" />
+                    <line x1="30" y1="110" x2="310" y2="110" stroke="#e2e8f0" strokeDasharray="3" />
+                    <line x1="30" y1="140" x2="310" y2="140" stroke="#94a3b8" />
+                    <line x1="30" y1="20" x2="30" y2="140" stroke="#94a3b8" />
 
-              {/* Gráfica 2: Sello / Fuga */}
-              <div className="border border-slate-300 p-2 text-center bg-white">
-                <span className="text-[10px] font-bold text-slate-700 block mb-1">
-                  Estabilidad de Sello (Hermeticidad a 90% Set Point)
-                </span>
-                <svg viewBox="0 0 320 160" className="w-full h-36 border border-slate-200 bg-slate-50">
-                  <line x1="30" y1="20" x2="310" y2="20" stroke="#e2e8f0" strokeDasharray="3" />
-                  <line x1="30" y1="50" x2="310" y2="50" stroke="#e2e8f0" strokeDasharray="3" />
-                  <line x1="30" y1="80" x2="310" y2="80" stroke="#e2e8f0" strokeDasharray="3" />
-                  <line x1="30" y1="140" x2="310" y2="140" stroke="#94a3b8" />
-                  <line x1="30" y1="20" x2="30" y2="140" stroke="#94a3b8" />
+                    <text x="26" y="24" fontSize="8" textAnchor="end" fill="#64748b">200</text>
+                    <text x="26" y="54" fontSize="8" textAnchor="end" fill="#64748b">175</text>
+                    <text x="26" y="84" fontSize="8" textAnchor="end" fill="#64748b">150</text>
+                    <text x="26" y="114" fontSize="8" textAnchor="end" fill="#64748b">100</text>
+                    <text x="26" y="144" fontSize="8" textAnchor="end" fill="#64748b">0</text>
+                    <text x="170" y="155" fontSize="8" textAnchor="middle" fill="#64748b">Tiempo (seg)</text>
 
-                  <text x="26" y="54" fontSize="8" textAnchor="end" fill="#64748b">165</text>
-                  <text x="26" y="84" fontSize="8" textAnchor="end" fill="#64748b">150</text>
-                  <text x="26" y="144" fontSize="8" textAnchor="end" fill="#64748b">0</text>
-                  <text x="170" y="155" fontSize="8" textAnchor="middle" fill="#64748b">Tiempo de sostenimiento: 120s</text>
+                    <line x1="30" y1="50" x2="310" y2="50" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4" />
+                    <text x="290" y="46" fontSize="7" fill="#ef4444" fontWeight="bold">Set: {setPoint} psi</text>
 
-                  <path
-                    d="M 30,140 L 70,55 L 280,55 L 305,140"
-                    fill="none"
-                    stroke="#059669"
-                    strokeWidth="2"
-                  />
-                  <text x="175" y="47" fontSize="8" fill="#065f46" fontWeight="bold" textAnchor="middle">
-                    165 psi sostenido sin fuga (0 bpm)
-                  </text>
-                </svg>
-                <span className="text-[9px] text-slate-500 italic block mt-1">Criterio API 527: 0 burbujas por minuto</span>
+                    <path
+                      d="M 30,140 Q 90,135 120,90 T 170,48 L 180,68 Q 210,50 240,49 L 260,70 L 300,138"
+                      fill="none"
+                      stroke={colorSecundario}
+                      strokeWidth="2"
+                    />
+                    <circle cx="170" cy="48" r="3" fill={colorSecundario} />
+                    <text x="170" y="40" fontSize="7" fill={colorSecundario} fontWeight="bold" textAnchor="middle">{d.disparoAjustadoPsi.toFixed(1)} psi</text>
+                  </svg>
+                  <span className="text-[9px] text-slate-500 italic block mt-1">Medio: Nitrógeno | Sensor Calibrado</span>
+                </div>
+
+                {/* Gráfica 2: Sello / Fuga */}
+                <div className="border border-slate-300 p-2 text-center bg-white">
+                  <span className="text-[10px] font-bold text-slate-700 block mb-1">
+                    Prueba de Sello / Disparo - Salida
+                  </span>
+                  <svg viewBox="0 0 320 160" className="w-full h-36 border border-slate-200 bg-slate-50">
+                    <line x1="30" y1="20" x2="310" y2="20" stroke="#e2e8f0" strokeDasharray="3" />
+                    <line x1="30" y1="50" x2="310" y2="50" stroke="#e2e8f0" strokeDasharray="3" />
+                    <line x1="30" y1="80" x2="310" y2="80" stroke="#e2e8f0" strokeDasharray="3" />
+                    <line x1="30" y1="140" x2="310" y2="140" stroke="#94a3b8" />
+                    <line x1="30" y1="20" x2="30" y2="140" stroke="#94a3b8" />
+
+                    <text x="26" y="54" fontSize="8" textAnchor="end" fill="#64748b">165</text>
+                    <text x="26" y="84" fontSize="8" textAnchor="end" fill="#64748b">150</text>
+                    <text x="26" y="144" fontSize="8" textAnchor="end" fill="#64748b">0</text>
+                    <text x="170" y="155" fontSize="8" textAnchor="middle" fill="#64748b">Tiempo de sostenimiento: 120s</text>
+
+                    <path
+                      d="M 30,140 L 70,55 L 280,55 L 305,140"
+                      fill="none"
+                      stroke="#059669"
+                      strokeWidth="2"
+                    />
+                    <text x="175" y="47" fontSize="8" fill="#065f46" fontWeight="bold" textAnchor="middle">
+                      {d.puntoSelloPsi.toFixed(1)} psi sostenido sin fuga (0 bpm)
+                    </text>
+                  </svg>
+                  <span className="text-[9px] text-slate-500 italic block mt-1">Criterio API 527: 0 burbujas por minuto</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="text-right text-[9px] text-slate-400 pt-3 border-t border-slate-200 mt-6">

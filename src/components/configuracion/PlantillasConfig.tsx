@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import type { PlantillaDocumental, CodigoClasificacion, Usuario } from '../../types';
+import type { 
+  PlantillaDocumental, 
+  CodigoClasificacion, 
+  Usuario, 
+  SeccionesVisiblesPlantilla, 
+  TextosSeccionesPlantilla 
+} from '../../types';
 import { storageService } from '../../services/storageService';
 import {
   DEFAULT_LOGO_IZQUIERDO,
@@ -27,7 +33,41 @@ import {
   RotateCcw,
   Layers,
   RefreshCw,
+  Type,
+  ListChecks,
 } from 'lucide-react';
+
+const DEFAULT_SECCIONES: SeccionesVisiblesPlantilla = {
+  datosSolicitante: true,
+  datosEquipo: true,
+  condicionesAmbientales: true,
+  equiposAuxiliares: true,
+  documentoNormativo: true,
+  trazabilidadMetrologica: true,
+  resultadosPrueba: true,
+  graficasServicio: true,
+  observaciones: true,
+  firmas: true,
+};
+
+const DEFAULT_TEXTOS: TextosSeccionesPlantilla = {
+  tituloSolicitante: '1. DATOS DEL SOLICITANTE Y SERVICIO',
+  tituloEquipo: '2. IDENTIFICACIÓN Y ESPECIFICACIONES DEL ELEMENTO',
+  tituloCondiciones: '3. CONDICIONES AMBIENTALES',
+  tituloAuxiliares: '4. EQUIPOS AUXILIARES UTILIZADOS',
+  tituloNormativo: '5. DOCUMENTO NORMATIVO O MÉTODO APLICADO',
+  contenidoNormativo: 'Conforme a los procedimientos técnicos internos, normas técnicas aplicables y especificaciones del fabricante.',
+  tituloTrazabilidad: '6. TRAZABILIDAD METROLÓGICA',
+  contenidoTrazabilidad: 'Los resultados contenidos en este reporte cuentan con trazabilidad metrológica hacia patrones nacionales e internacionales del Sistema Internacional de Unidades (SI), custodiados por institutos metrológicos como el PTB (Alemania), NIST (USA) y el BIPM.',
+  tituloResultados: '7. RESULTADOS DE LA PRUEBA / ENSAYO',
+  tituloGraficas: '8. REPRESENTACIÓN GRÁFICA DEL SERVICIO',
+  titulosGraficasPorDefecto: ['Prueba de Sello / Disparo - Entrada', 'Prueba de Sello / Disparo - Salida'],
+  tituloObservaciones: '9. OBSERVACIONES TÉCNICAS',
+  contenidoObservaciones: 'El ítem fue inspeccionado y probado en las condiciones operativas estipuladas. Los resultados son válidos exclusivamente para el objeto evaluado.',
+  tituloAutorizacion: 'AUTORIZACIÓN DEL REPORTE',
+  cargoAutorizador: 'Director Técnico / Metrólogo Responsable',
+  textoFinReporte: '*** FIN DEL REPORTE ***',
+};
 
 interface PlantillasConfigProps {
   usuarioActual: Usuario;
@@ -42,6 +82,7 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
   const [previewPlantilla, setPreviewPlantilla] = useState<PlantillaDocumental | null>(null);
   const [replicarLogosATodas, setReplicarLogosATodas] = useState<boolean>(true);
   const [replicarColoresATodas, setReplicarColoresATodas] = useState<boolean>(true);
+  const [tabModal, setTabModal] = useState<'identificacion' | 'logos' | 'secciones' | 'textos'>('identificacion');
 
   const puedeEditar = ['administrador', 'director_tecnico'].includes(usuarioActual.rol);
 
@@ -65,6 +106,7 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
       subtituloNormativo: 'Conforme a Procedimiento Técnico Interno',
       codigoFormato: 'FOR-MET-VT-01',
       versionRevision: 'v1.0 (Rev 01)',
+      fechaFormato: '24/03/2026',
       logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
       logoDerechoUrl: DEFAULT_LOGO_DERECHO,
       colorPrimario: DEFAULT_COLOR_PRIMARIO,
@@ -74,8 +116,11 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
         'Los resultados contenidos en este reporte cuentan con trazabilidad metrológica hacia patrones nacionales e internacionales del Sistema Internacional de Unidades (SI).',
       declaracionesConformidadPorDefecto:
         'Los resultados expresados se refieren exclusivamente al ítem inspeccionado y en las condiciones indicadas.',
+      seccionesVisibles: { ...DEFAULT_SECCIONES },
+      textosSecciones: { ...DEFAULT_TEXTOS },
       activa: true,
     });
+    setTabModal('identificacion');
     setModalAbierto(true);
   };
 
@@ -88,7 +133,11 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
       colorPrimario: p.colorPrimario || globalCfg.colorPrimario || DEFAULT_COLOR_PRIMARIO,
       colorSecundario: p.colorSecundario || globalCfg.colorSecundario || DEFAULT_COLOR_SECUNDARIO,
       colorTextoEncabezado: p.colorTextoEncabezado || globalCfg.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
+      fechaFormato: p.fechaFormato || '24/03/2026',
+      seccionesVisibles: { ...DEFAULT_SECCIONES, ...(p.seccionesVisibles || {}) },
+      textosSecciones: { ...DEFAULT_TEXTOS, ...(p.textosSecciones || {}) },
     });
+    setTabModal('identificacion');
     setModalAbierto(true);
   };
 
@@ -523,381 +572,1011 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
               </button>
             </div>
 
-            <form onSubmit={handleGuardarModal} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto text-xs">
-              {/* Sección 1: Logos Institucionales (Izquierdo y Derecho) */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-                    <ImageIcon className="w-4 h-4 text-emerald-600" />
-                    Logos del Certificado (Izquierdo y Derecho)
-                  </span>
-                  <span className="text-[10px] text-slate-500">
-                    PNG, JPG, WebP o SVG (Máx 2MB)
-                  </span>
-                </div>
+            {/* Navegación por Pestañas del Editor */}
+            <div className="flex border-b border-slate-200 bg-slate-100/80 px-6 pt-2 gap-2 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setTabModal('identificacion')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition cursor-pointer ${
+                  tabModal === 'identificacion'
+                    ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-lg'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Languages className="w-4 h-4 text-emerald-600" />
+                <span>1. Identificación & Formato</span>
+              </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Logo Izquierdo */}
-                  <div className="bg-white p-3.5 rounded-lg border border-slate-200 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-700 text-[11px]">Logo Lado Izquierdo</span>
-                      <span className="text-[9px] text-slate-400 uppercase">Empresa / BI</span>
+              <button
+                type="button"
+                onClick={() => setTabModal('logos')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition cursor-pointer ${
+                  tabModal === 'logos'
+                    ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-lg'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Palette className="w-4 h-4 text-purple-600" />
+                <span>2. Logos & Paleta Visual</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTabModal('secciones')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition cursor-pointer ${
+                  tabModal === 'secciones'
+                    ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-lg'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ListChecks className="w-4 h-4 text-blue-600" />
+                <span>3. Secciones Activas</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTabModal('textos')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition cursor-pointer ${
+                  tabModal === 'textos'
+                    ? 'border-emerald-600 text-emerald-800 bg-white rounded-t-lg'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Type className="w-4 h-4 text-amber-600" />
+                <span>4. Textos & Cláusulas</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarModal} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
+              {/* PESTAÑA 1: IDENTIFICACIÓN & FORMATO */}
+              {tabModal === 'identificacion' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Disciplina / Clasificación Metrológica
+                      </label>
+                      <select
+                        value={plantillaEnEdicion.clasificacionCodigo}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({
+                            ...plantillaEnEdicion,
+                            clasificacionCodigo: e.target.value as CodigoClasificacion,
+                          })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2.5 bg-white text-slate-800 font-medium"
+                      >
+                        <option value="VT">VT - Válvulas de Seguridad y/o Alivio</option>
+                        <option value="TB">TB - Ensayos Hidrostáticos de Tuberías y Spools</option>
+                        <option value="PR">PR - Calibración Magnitud Presión (Manómetros/Transmisores)</option>
+                        <option value="TM">TM - Calibración Magnitud Temperatura (Termómetros/RTDs)</option>
+                        <option value="EL">EL - Calibración Magnitudes Eléctricas (Multímetros/Pinzas)</option>
+                      </select>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-lg border border-slate-300 bg-slate-50 flex items-center justify-center p-1 shrink-0 overflow-hidden">
-                        {plantillaEnEdicion.logoIzquierdoUrl ? (
-                          <img
-                            src={plantillaEnEdicion.logoIzquierdoUrl}
-                            alt="Logo Izquierdo"
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-[9px] text-slate-400 text-center">Sin Logo</span>
-                        )}
-                      </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Tipo de Elemento / Aplicación
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. Válvula de Seguridad y/o Alivio (PSV)"
+                        value={plantillaEnEdicion.tipoElemento}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({ ...plantillaEnEdicion, tipoElemento: e.target.value })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-800"
+                      />
+                    </div>
+                  </div>
 
-                      <div className="space-y-1.5 flex-1">
-                        <label className="flex items-center justify-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold cursor-pointer border border-slate-300 transition">
-                          <Upload className="w-3 h-3" />
-                          <span>Subir Imagen</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleLogoUpload(e, 'izquierdo')}
-                          />
-                        </label>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Nombre Identificador de la Plantilla
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Válvulas de Seguridad y/o Alivio (PSV) - ASME / API"
+                      value={plantillaEnEdicion.nombreIdentificador}
+                      onChange={(e) =>
+                        setPlantillaEnEdicion({ ...plantillaEnEdicion, nombreIdentificador: e.target.value })
+                      }
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-800 font-medium"
+                    />
+                  </div>
 
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlantillaEnEdicion({
-                                ...plantillaEnEdicion,
-                                logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
-                              })
-                            }
-                            className="px-2 py-1 text-[10px] text-emerald-700 hover:bg-emerald-50 rounded border border-emerald-200 transition"
-                            title="Restaurar logo corporativo BI por defecto"
-                          >
-                            Restaurar BI
-                          </button>
-                          {plantillaEnEdicion.logoIzquierdoUrl && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPlantillaEnEdicion({
-                                  ...plantillaEnEdicion,
-                                  logoIzquierdoUrl: '',
-                                })
-                              }
-                              className="px-2 py-1 text-[10px] text-rose-600 hover:bg-rose-50 rounded border border-rose-200 transition"
-                            >
-                              Quitar
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                  {/* Títulos Oficiales del Certificado */}
+                  <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 space-y-3">
+                    <span className="font-bold text-emerald-950 block flex items-center gap-1.5 text-xs">
+                      <Languages className="w-4 h-4 text-emerald-600" />
+                      Títulos del Encabezado del Certificado
+                    </span>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Título Oficial en Español (Mayúsculas)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. REPORTE DE PRUEBA DE VALVULAS DE SEGURIDAD Y/O ALIVIO"
+                        value={plantillaEnEdicion.tituloReporteEs}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({
+                            ...plantillaEnEdicion,
+                            tituloReporteEs: e.target.value.toUpperCase(),
+                          })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2 font-bold uppercase tracking-tight text-slate-900 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Título Oficial Equivalente en Inglés
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Safety and/or Relief Valve Test Report"
+                        value={plantillaEnEdicion.tituloReporteEn || ''}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({ ...plantillaEnEdicion, tituloReporteEn: e.target.value })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2 italic bg-white text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Subtítulo / Norma de Referencia
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Conforme a Código ASME Sec. VIII Div. 1 & Norma API 527"
+                        value={plantillaEnEdicion.subtituloNormativo || ''}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({ ...plantillaEnEdicion, subtituloNormativo: e.target.value })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                      />
                     </div>
                   </div>
 
-                  {/* Logo Derecho */}
-                  <div className="bg-white p-3.5 rounded-lg border border-slate-200 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-700 text-[11px]">Logo Lado Derecho</span>
-                      <span className="text-[9px] text-slate-400 uppercase">Sello / Laboratorio</span>
+                  {/* Metadatos de Control Documental */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Código de Formato
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. FOR-PCC-274"
+                        value={plantillaEnEdicion.codigoFormato}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({ ...plantillaEnEdicion, codigoFormato: e.target.value })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2 font-mono uppercase bg-white"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Ej: FOR-PCC-274</span>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-lg border border-slate-300 bg-slate-50 flex items-center justify-center p-1 shrink-0 overflow-hidden">
-                        {plantillaEnEdicion.logoDerechoUrl ? (
-                          <img
-                            src={plantillaEnEdicion.logoDerechoUrl}
-                            alt="Logo Derecho"
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-[9px] text-slate-400 text-center">Sin Logo</span>
-                        )}
-                      </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Versión / Revisión
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. Vr: 01"
+                        value={plantillaEnEdicion.versionRevision}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({ ...plantillaEnEdicion, versionRevision: e.target.value })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2 font-mono bg-white"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Ej: Vr: 01</span>
+                    </div>
 
-                      <div className="space-y-1.5 flex-1">
-                        <label className="flex items-center justify-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold cursor-pointer border border-slate-300 transition">
-                          <Upload className="w-3 h-3" />
-                          <span>Subir Imagen</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleLogoUpload(e, 'derecho')}
-                          />
-                        </label>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlantillaEnEdicion({
-                                ...plantillaEnEdicion,
-                                logoDerechoUrl: DEFAULT_LOGO_DERECHO,
-                              })
-                            }
-                            className="px-2 py-1 text-[10px] text-emerald-700 hover:bg-emerald-50 rounded border border-emerald-200 transition"
-                            title="Restaurar sello de laboratorio por defecto"
-                          >
-                            Restaurar Sello
-                          </button>
-                          {plantillaEnEdicion.logoDerechoUrl && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPlantillaEnEdicion({
-                                  ...plantillaEnEdicion,
-                                  logoDerechoUrl: '',
-                                })
-                              }
-                              className="px-2 py-1 text-[10px] text-rose-600 hover:bg-rose-50 rounded border border-rose-200 transition"
-                            >
-                              Quitar
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Fecha del Formato
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. 24/03/2026"
+                        value={plantillaEnEdicion.fechaFormato || '24/03/2026'}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({ ...plantillaEnEdicion, fechaFormato: e.target.value })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2 font-mono bg-white"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Fecha de vigencia documental</span>
                     </div>
                   </div>
-                </div>
 
-                {/* Banner de Replicación de Logos a Todos los Grupos */}
-                <div className="bg-emerald-50/90 border border-emerald-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-center gap-2 pt-2">
                     <input
                       type="checkbox"
-                      id="replicarLogos"
-                      checked={replicarLogosATodas}
-                      onChange={(e) => setReplicarLogosATodas(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                      id="activa"
+                      checked={plantillaEnEdicion.activa}
+                      onChange={(e) =>
+                        setPlantillaEnEdicion({ ...plantillaEnEdicion, activa: e.target.checked })
+                      }
+                      className="rounded text-emerald-600 w-4 h-4 cursor-pointer"
                     />
-                    <div>
-                      <label htmlFor="replicarLogos" className="font-bold text-emerald-950 text-xs cursor-pointer block">
-                        Copiar estos logotipos a todos los demás grupos de plantillas
-                      </label>
-                      <p className="text-[11px] text-emerald-800 mt-0.5">
-                        Al guardar, se actualizarán automáticamente en Válvulas de Seguridad, Control, On/Off, Manuales, Tubería, Presión, Temperatura y Eléctricas ({plantillas.length} plantillas configuradas).
-                      </p>
+                    <label htmlFor="activa" className="font-semibold text-slate-700 cursor-pointer">
+                      Plantilla Activa (disponible para nuevos reportes de ensayo)
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* PESTAÑA 2: LOGOS & PALETA VISUAL */}
+              {tabModal === 'logos' && (
+                <div className="space-y-4">
+                  {/* Logos Institucionales (Izquierdo y Derecho) */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <ImageIcon className="w-4 h-4 text-emerald-600" />
+                        Logos del Certificado (Izquierdo y Derecho)
+                      </span>
+                      <span className="text-[10px] text-slate-500">PNG, JPG, WebP o SVG (Máx 2MB)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Logo Izquierdo */}
+                      <div className="bg-white p-3.5 rounded-lg border border-slate-200 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-700 text-[11px]">Logo Lado Izquierdo</span>
+                          <span className="text-[9px] text-slate-400 uppercase">Empresa / BI</span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-lg border border-slate-300 bg-slate-50 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                            {plantillaEnEdicion.logoIzquierdoUrl ? (
+                              <img
+                                src={plantillaEnEdicion.logoIzquierdoUrl}
+                                alt="Logo Izquierdo"
+                                className="max-h-full max-w-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-[9px] text-slate-400 text-center">Sin Logo</span>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5 flex-1">
+                            <label className="flex items-center justify-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold cursor-pointer border border-slate-300 transition">
+                              <Upload className="w-3 h-3" />
+                              <span>Subir Imagen</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleLogoUpload(e, 'izquierdo')}
+                              />
+                            </label>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPlantillaEnEdicion({
+                                    ...plantillaEnEdicion,
+                                    logoIzquierdoUrl: DEFAULT_LOGO_IZQUIERDO,
+                                  })
+                                }
+                                className="px-2 py-1 text-[10px] text-emerald-700 hover:bg-emerald-50 rounded border border-emerald-200 transition"
+                                title="Restaurar logo corporativo BI por defecto"
+                              >
+                                Restaurar BI
+                              </button>
+                              {plantillaEnEdicion.logoIzquierdoUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPlantillaEnEdicion({
+                                      ...plantillaEnEdicion,
+                                      logoIzquierdoUrl: '',
+                                    })
+                                  }
+                                  className="px-2 py-1 text-[10px] text-rose-600 hover:bg-rose-50 rounded border border-rose-200 transition"
+                                >
+                                  Quitar
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Logo Derecho */}
+                      <div className="bg-white p-3.5 rounded-lg border border-slate-200 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-700 text-[11px]">Logo Lado Derecho</span>
+                          <span className="text-[9px] text-slate-400 uppercase">Sello / Laboratorio</span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-lg border border-slate-300 bg-slate-50 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                            {plantillaEnEdicion.logoDerechoUrl ? (
+                              <img
+                                src={plantillaEnEdicion.logoDerechoUrl}
+                                alt="Logo Derecho"
+                                className="max-h-full max-w-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-[9px] text-slate-400 text-center">Sin Logo</span>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5 flex-1">
+                            <label className="flex items-center justify-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold cursor-pointer border border-slate-300 transition">
+                              <Upload className="w-3 h-3" />
+                              <span>Subir Imagen</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleLogoUpload(e, 'derecho')}
+                              />
+                            </label>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPlantillaEnEdicion({
+                                    ...plantillaEnEdicion,
+                                    logoDerechoUrl: DEFAULT_LOGO_DERECHO,
+                                  })
+                                }
+                                className="px-2 py-1 text-[10px] text-emerald-700 hover:bg-emerald-50 rounded border border-emerald-200 transition"
+                                title="Restaurar sello de laboratorio por defecto"
+                              >
+                                Restaurar Sello
+                              </button>
+                              {plantillaEnEdicion.logoDerechoUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPlantillaEnEdicion({
+                                      ...plantillaEnEdicion,
+                                      logoDerechoUrl: '',
+                                    })
+                                  }
+                                  className="px-2 py-1 text-[10px] text-rose-600 hover:bg-rose-50 rounded border border-rose-200 transition"
+                                >
+                                  Quitar
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Banner de Replicación de Logos a Todas */}
+                    <div className="bg-emerald-50/90 border border-emerald-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          id="replicarLogos"
+                          checked={replicarLogosATodas}
+                          onChange={(e) => setReplicarLogosATodas(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <div>
+                          <label htmlFor="replicarLogos" className="font-bold text-emerald-950 text-xs cursor-pointer block">
+                            Copiar estos logotipos a todas las demás plantillas ({plantillas.length} configuradas)
+                          </label>
+                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                            Se actualizarán automáticamente en Válvulas, Tuberías, Presión, Temperatura y Eléctricas.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleCopiarLogosATodasAhora}
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition shrink-0 cursor-pointer"
+                      >
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>Copiar a todas ahora</span>
+                      </button>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleCopiarLogosATodasAhora}
-                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition shrink-0 cursor-pointer"
-                    title="Copiar logotipos inmediatamente a todas las plantillas"
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>Copiar a todas ahora</span>
-                  </button>
+                  {/* Colores Personalizados del Certificado */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <Palette className="w-4 h-4 text-emerald-600" />
+                        Colores Institucionales
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPlantillaEnEdicion({
+                            ...plantillaEnEdicion,
+                            colorPrimario: DEFAULT_COLOR_PRIMARIO,
+                            colorSecundario: DEFAULT_COLOR_SECUNDARIO,
+                            colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
+                          })
+                        }
+                        className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-800"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Valores por defecto</span>
+                      </button>
+                    </div>
+
+                    {/* Paletas Predefinidas */}
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase block mb-1.5">
+                        Paletas Predefinidas:
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                        {PALETAS_PREDEFINIDAS.map((paleta) => {
+                          const activa =
+                            plantillaEnEdicion.colorPrimario?.toLowerCase() === paleta.primario.toLowerCase() &&
+                            plantillaEnEdicion.colorSecundario?.toLowerCase() === paleta.secundario.toLowerCase();
+
+                          return (
+                            <button
+                              key={paleta.nombre}
+                              type="button"
+                              onClick={() =>
+                                setPlantillaEnEdicion({
+                                  ...plantillaEnEdicion,
+                                  colorPrimario: paleta.primario,
+                                  colorSecundario: paleta.secundario,
+                                  colorTextoEncabezado: paleta.texto,
+                                })
+                              }
+                              className={`p-2 rounded-lg border text-left transition flex flex-col justify-between cursor-pointer ${
+                                activa
+                                  ? 'border-emerald-600 bg-emerald-50/50 ring-1 ring-emerald-500'
+                                  : 'border-slate-200 bg-white hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1 mb-1">
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
+                                  style={{ backgroundColor: paleta.primario }}
+                                />
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
+                                  style={{ backgroundColor: paleta.secundario }}
+                                />
+                              </div>
+                              <span className="font-bold text-[10px] text-slate-800 leading-tight block">
+                                {paleta.nombre}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Inputs de Colores */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                        <label className="block font-semibold text-slate-700 text-[11px] mb-1">
+                          Color Primario (Tablas)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={plantillaEnEdicion.colorPrimario || DEFAULT_COLOR_PRIMARIO}
+                            onChange={(e) =>
+                              setPlantillaEnEdicion({
+                                ...plantillaEnEdicion,
+                                colorPrimario: e.target.value,
+                              })
+                            }
+                            className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={plantillaEnEdicion.colorPrimario || DEFAULT_COLOR_PRIMARIO}
+                            onChange={(e) =>
+                              setPlantillaEnEdicion({
+                                ...plantillaEnEdicion,
+                                colorPrimario: e.target.value,
+                              })
+                            }
+                            className="w-full font-mono text-xs border border-slate-300 rounded px-2 py-1 uppercase"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                        <label className="block font-semibold text-slate-700 text-[11px] mb-1">
+                          Color Secundario (Títulos)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={plantillaEnEdicion.colorSecundario || DEFAULT_COLOR_SECUNDARIO}
+                            onChange={(e) =>
+                              setPlantillaEnEdicion({
+                                ...plantillaEnEdicion,
+                                colorSecundario: e.target.value,
+                              })
+                            }
+                            className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={plantillaEnEdicion.colorSecundario || DEFAULT_COLOR_SECUNDARIO}
+                            onChange={(e) =>
+                              setPlantillaEnEdicion({
+                                ...plantillaEnEdicion,
+                                colorSecundario: e.target.value,
+                              })
+                            }
+                            className="w-full font-mono text-xs border border-slate-300 rounded px-2 py-1 uppercase"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                        <label className="block font-semibold text-slate-700 text-[11px] mb-1">
+                          Texto de Encabezados
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={plantillaEnEdicion.colorTextoEncabezado || DEFAULT_COLOR_TEXTO}
+                            onChange={(e) =>
+                              setPlantillaEnEdicion({
+                                ...plantillaEnEdicion,
+                                colorTextoEncabezado: e.target.value,
+                              })
+                            }
+                            className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={plantillaEnEdicion.colorTextoEncabezado || DEFAULT_COLOR_TEXTO}
+                            onChange={(e) =>
+                              setPlantillaEnEdicion({
+                                ...plantillaEnEdicion,
+                                colorTextoEncabezado: e.target.value,
+                              })
+                            }
+                            className="w-full font-mono text-xs border border-slate-300 rounded px-2 py-1 uppercase"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="replicarColores"
+                          checked={replicarColoresATodas}
+                          onChange={(e) => setReplicarColoresATodas(e.target.checked)}
+                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <label htmlFor="replicarColores" className="text-xs font-semibold text-slate-800 cursor-pointer">
+                          Copiar también esta paleta de colores a todas las demás plantillas
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Sección 2: Paleta de Colores del Certificado */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-                    <Palette className="w-4 h-4 text-emerald-600" />
-                    Colores Personalizados del Certificado
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPlantillaEnEdicion({
-                        ...plantillaEnEdicion,
-                        colorPrimario: DEFAULT_COLOR_PRIMARIO,
-                        colorSecundario: DEFAULT_COLOR_SECUNDARIO,
-                        colorTextoEncabezado: DEFAULT_COLOR_TEXTO,
-                      })
-                    }
-                    className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-800"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Valores por defecto</span>
-                  </button>
-                </div>
+              {/* PESTAÑA 3: SECCIONES ACTIVAS (VISIBILIDAD) */}
+              {tabModal === 'secciones' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50/80 border border-blue-200 p-3.5 rounded-xl text-blue-900 text-xs">
+                    <p className="font-semibold flex items-center gap-1.5 mb-1">
+                      <ListChecks className="w-4 h-4 text-blue-600" />
+                      Control Modular de Secciones en el Certificado Oficial
+                    </p>
+                    <p className="text-[11px] text-blue-800 leading-relaxed">
+                      Activa o desactiva las secciones que deben figurar en la plantilla. El documento PDF reacomodará automáticamente el contenido manteniendo la estética profesional de 3 páginas.
+                    </p>
+                  </div>
 
-                {/* Botones de Paletas Predefinidas */}
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase block mb-1.5">
-                    Paletas Predefinidas (Clic para aplicar):
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                    {PALETAS_PREDEFINIDAS.map((paleta) => {
-                      const activa =
-                        plantillaEnEdicion.colorPrimario?.toLowerCase() === paleta.primario.toLowerCase() &&
-                        plantillaEnEdicion.colorSecundario?.toLowerCase() === paleta.secundario.toLowerCase();
-
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { key: 'datosSolicitante', label: '1. Datos del Solicitante y Servicio', desc: 'Cliente, dirección, contrato/OC, fechas y lugar de ejecución' },
+                      { key: 'datosEquipo', label: '2. Identificación del Ítem / Válvula', desc: 'Fabricante, serial, tag, dimensiones, materiales cuerpo y disco' },
+                      { key: 'condicionesAmbientales', label: '3. Condiciones Ambientales', desc: 'Tabla de Temperatura y Humedad Relativa (Mín, Máx, Promedio)' },
+                      { key: 'equiposAuxiliares', label: '4. Equipos Auxiliares Utilizados', desc: 'Manómetros de banco, termómetros y fluidos de ensayo' },
+                      { key: 'documentoNormativo', label: '5. Documento Normativo o Método', desc: 'Procedimiento técnico interno, API 527, ASME B31.3' },
+                      { key: 'trazabilidadMetrologica', label: '6. Trazabilidad Metrológica ISO 17025', desc: 'Instrumentos patrón, certificados de calibración y vigencias' },
+                      { key: 'resultadosPrueba', label: '7. Resultados de Ensayos / Calibración', desc: 'Tabla comparativa ENCONTRADO vs DEJADO y Set Point' },
+                      { key: 'graficasServicio', label: '8. Representación Gráfica del Servicio', desc: 'Capturas de curvas de presión (psi) vs tiempo (seg)' },
+                      { key: 'observaciones', label: '9. Observaciones Técnicas y Dictamen', desc: 'Conclusiones y cláusulas de responsabilidad metrológica' },
+                      { key: 'firmas', label: '10. Autorización y Firmas Digitales', desc: 'Firma y cargo del Director Técnico / Metrólogo responsable' },
+                    ].map((sec) => {
+                      const visible = plantillaEnEdicion.seccionesVisibles?.[sec.key as keyof SeccionesVisiblesPlantilla] ?? true;
                       return (
-                        <button
-                          key={paleta.nombre}
-                          type="button"
-                          onClick={() =>
+                        <div
+                          key={sec.key}
+                          onClick={() => {
+                            const nuevasSecciones = {
+                              ...(plantillaEnEdicion.seccionesVisibles || DEFAULT_SECCIONES),
+                              [sec.key]: !visible,
+                            };
                             setPlantillaEnEdicion({
                               ...plantillaEnEdicion,
-                              colorPrimario: paleta.primario,
-                              colorSecundario: paleta.secundario,
-                              colorTextoEncabezado: paleta.texto,
-                            })
-                          }
-                          className={`p-2 rounded-lg border text-left transition flex flex-col justify-between ${
-                            activa
-                              ? 'border-emerald-600 bg-emerald-50/50 ring-1 ring-emerald-500'
-                              : 'border-slate-200 bg-white hover:border-slate-300'
+                              seccionesVisibles: nuevasSecciones,
+                            });
+                          }}
+                          className={`p-3.5 rounded-xl border transition cursor-pointer flex items-start gap-3 select-none ${
+                            visible
+                              ? 'bg-white border-emerald-300 shadow-xs'
+                              : 'bg-slate-50 border-slate-200 opacity-60'
                           }`}
                         >
-                          <div className="flex items-center gap-1 mb-1.5">
-                            <span
-                              className="w-4 h-4 rounded-full border border-black/10 shrink-0"
-                              style={{ backgroundColor: paleta.primario }}
-                            />
-                            <span
-                              className="w-4 h-4 rounded-full border border-black/10 shrink-0"
-                              style={{ backgroundColor: paleta.secundario }}
-                            />
+                          <input
+                            type="checkbox"
+                            checked={visible}
+                            onChange={() => {}}
+                            className="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 pointer-events-none"
+                          />
+                          <div className="flex-1">
+                            <span className={`font-bold text-xs block ${visible ? 'text-slate-900' : 'text-slate-500'}`}>
+                              {sec.label}
+                            </span>
+                            <span className="text-[10px] text-slate-500 leading-tight block mt-0.5">
+                              {sec.desc}
+                            </span>
                           </div>
-                          <span className="font-bold text-[10px] text-slate-800 leading-tight block">
-                            {paleta.nombre}
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                              visible ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                            }`}
+                          >
+                            {visible ? 'Visible' : 'Oculta'}
                           </span>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
+              )}
 
-                {/* Inputs de Colores Específicos */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                    <label className="block font-semibold text-slate-700 text-[11px] mb-1">
-                      Color Primario (Tablas)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={plantillaEnEdicion.colorPrimario || DEFAULT_COLOR_PRIMARIO}
-                        onChange={(e) =>
-                          setPlantillaEnEdicion({
-                            ...plantillaEnEdicion,
-                            colorPrimario: e.target.value,
-                          })
-                        }
-                        className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
-                      />
-                      <input
-                        type="text"
-                        value={plantillaEnEdicion.colorPrimario || DEFAULT_COLOR_PRIMARIO}
-                        onChange={(e) =>
-                          setPlantillaEnEdicion({
-                            ...plantillaEnEdicion,
-                            colorPrimario: e.target.value,
-                          })
-                        }
-                        className="w-full font-mono text-xs border border-slate-300 rounded px-2 py-1 uppercase"
-                      />
-                    </div>
-                    <span className="text-[9px] text-slate-400 mt-1 block">
-                      Fondo de cabeceras de tablas y datos
-                    </span>
+              {/* PESTAÑA 4: TEXTOS DE SECCIONES & CLÁUSULAS */}
+              {tabModal === 'textos' && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-xl text-amber-900 text-xs">
+                    <p className="font-semibold flex items-center gap-1.5 mb-1">
+                      <Type className="w-4 h-4 text-amber-600" />
+                      Personalización de Títulos y Cláusulas Técnicas
+                    </p>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      Edita los encabezados de las tablas, declaraciones legales de trazabilidad y títulos predeterminados para las curvas gráficas del servicio.
+                    </p>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                    <label className="block font-semibold text-slate-700 text-[11px] mb-1">
-                      Color Secundario (Títulos)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={plantillaEnEdicion.colorSecundario || DEFAULT_COLOR_SECUNDARIO}
-                        onChange={(e) =>
-                          setPlantillaEnEdicion({
-                            ...plantillaEnEdicion,
-                            colorSecundario: e.target.value,
-                          })
-                        }
-                        className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
-                      />
-                      <input
-                        type="text"
-                        value={plantillaEnEdicion.colorSecundario || DEFAULT_COLOR_SECUNDARIO}
-                        onChange={(e) =>
-                          setPlantillaEnEdicion({
-                            ...plantillaEnEdicion,
-                            colorSecundario: e.target.value,
-                          })
-                        }
-                        className="w-full font-mono text-xs border border-slate-300 rounded px-2 py-1 uppercase"
-                      />
-                    </div>
-                    <span className="text-[9px] text-slate-400 mt-1 block">
-                      Títulos principales, subtítulos y marcos
+                  {/* Títulos de Secciones */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <span className="font-bold text-slate-800 text-xs block">
+                      Títulos de Encabezados de Sección en el PDF
                     </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 1 (Solicitante)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloSolicitante || DEFAULT_TEXTOS.tituloSolicitante}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloSolicitante: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 2 (Identificación Ítem)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloEquipo || DEFAULT_TEXTOS.tituloEquipo}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloEquipo: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 3 (Condiciones Ambientales)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloCondiciones || DEFAULT_TEXTOS.tituloCondiciones}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloCondiciones: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 4 (Equipos Auxiliares)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloAuxiliares || DEFAULT_TEXTOS.tituloAuxiliares}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloAuxiliares: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 5 (Documento Normativo)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloNormativo || DEFAULT_TEXTOS.tituloNormativo}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloNormativo: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 6 (Trazabilidad Metrológica)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloTrazabilidad || DEFAULT_TEXTOS.tituloTrazabilidad}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloTrazabilidad: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 7 (Resultados)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloResultados || DEFAULT_TEXTOS.tituloResultados}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloResultados: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Sección 8 (Gráficas de Servicio)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.tituloGraficas || DEFAULT_TEXTOS.tituloGraficas}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                tituloGraficas: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                    <label className="block font-semibold text-slate-700 text-[11px] mb-1">
-                      Texto de Encabezados
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={plantillaEnEdicion.colorTextoEncabezado || DEFAULT_COLOR_TEXTO}
+                  {/* Configuración de Gráficas por Defecto */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <span className="font-bold text-slate-800 text-xs block">
+                      Títulos Predeterminados para Gráficas de Servicio (Imágenes de Curvas)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Gráfica #1 (Entrada / As-Found)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.titulosGraficasPorDefecto?.[0] || 'Prueba de Sello / Disparo - Entrada'}
+                          onChange={(e) => {
+                            const arr = [...(plantillaEnEdicion.textosSecciones?.titulosGraficasPorDefecto || ['Prueba de Sello / Disparo - Entrada', 'Prueba de Sello / Disparo - Salida'])];
+                            arr[0] = e.target.value;
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                titulosGraficasPorDefecto: arr,
+                              },
+                            });
+                          }}
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[11px] mb-1">
+                          Título Gráfica #2 (Salida / As-Left)
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.titulosGraficasPorDefecto?.[1] || 'Prueba de Sello / Disparo - Salida'}
+                          onChange={(e) => {
+                            const arr = [...(plantillaEnEdicion.textosSecciones?.titulosGraficasPorDefecto || ['Prueba de Sello / Disparo - Entrada', 'Prueba de Sello / Disparo - Salida'])];
+                            arr[1] = e.target.value;
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                titulosGraficasPorDefecto: arr,
+                              },
+                            });
+                          }}
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cláusulas Legales y Trazabilidad */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <span className="font-bold text-slate-800 text-xs block">
+                      Cláusulas Técnicas y Declaraciones Legales
+                    </span>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Declaración de Trazabilidad Metrológica por Defecto (NIST / PTB / SI)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={plantillaEnEdicion.textosSecciones?.contenidoTrazabilidad || plantillaEnEdicion.declaracionTrazabilidadPorDefecto || DEFAULT_TEXTOS.contenidoTrazabilidad}
                         onChange={(e) =>
                           setPlantillaEnEdicion({
                             ...plantillaEnEdicion,
-                            colorTextoEncabezado: e.target.value,
+                            declaracionTrazabilidadPorDefecto: e.target.value,
+                            textosSecciones: {
+                              ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                              contenidoTrazabilidad: e.target.value,
+                            },
                           })
                         }
-                        className="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5"
-                      />
-                      <input
-                        type="text"
-                        value={plantillaEnEdicion.colorTextoEncabezado || DEFAULT_COLOR_TEXTO}
-                        onChange={(e) =>
-                          setPlantillaEnEdicion({
-                            ...plantillaEnEdicion,
-                            colorTextoEncabezado: e.target.value,
-                          })
-                        }
-                        className="w-full font-mono text-xs border border-slate-300 rounded px-2 py-1 uppercase"
+                        className="w-full border border-slate-300 rounded-lg p-2.5 bg-white text-slate-800"
                       />
                     </div>
-                    <span className="text-[9px] text-slate-400 mt-1 block">
-                      Color de la letra sobre fondo de tabla
-                    </span>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Observaciones Técnicas Predeterminadas
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={plantillaEnEdicion.textosSecciones?.contenidoObservaciones || DEFAULT_TEXTOS.contenidoObservaciones}
+                        onChange={(e) =>
+                          setPlantillaEnEdicion({
+                            ...plantillaEnEdicion,
+                            textosSecciones: {
+                              ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                              contenidoObservaciones: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full border border-slate-300 rounded-lg p-2.5 bg-white text-slate-800"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Cargo o Leyenda del Autorizador
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.cargoAutorizador || DEFAULT_TEXTOS.cargoAutorizador}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                cargoAutorizador: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Texto de Cierre al Pie de la Página
+                        </label>
+                        <input
+                          type="text"
+                          value={plantillaEnEdicion.textosSecciones?.textoFinReporte || DEFAULT_TEXTOS.textoFinReporte}
+                          onChange={(e) =>
+                            setPlantillaEnEdicion({
+                              ...plantillaEnEdicion,
+                              textosSecciones: {
+                                ...(plantillaEnEdicion.textosSecciones || DEFAULT_TEXTOS),
+                                textoFinReporte: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono text-center"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                {/* Opción para replicar también la paleta de colores */}
-                <div className="bg-white border border-slate-200 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-xs">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="replicarColores"
-                      checked={replicarColoresATodas}
-                      onChange={(e) => setReplicarColoresATodas(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                    />
-                    <label htmlFor="replicarColores" className="text-xs font-semibold text-slate-800 cursor-pointer">
-                      Copiar también esta paleta de colores (tablas y títulos) a todas las demás plantillas
-                    </label>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
-                    Tablas: {plantillaEnEdicion.colorPrimario} | Títulos: {plantillaEnEdicion.colorSecundario}
-                  </span>
-                </div>
-              </div>
-
-              {/* Sección 3: Previsualización en Vivo del Certificado */}
-              <div className="space-y-1.5">
+              {/* Previsualización en Tiempo Real */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-200">
                 <span className="font-bold text-slate-700 text-[11px] block">
-                  Previsualización en Tiempo Real del Encabezado & Tablas:
+                  Previsualización en Tiempo Real del Encabezado & Formato:
                 </span>
                 <div
                   className="border-2 p-3 bg-white shadow-xs rounded"
@@ -939,21 +1618,29 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
                       </span>
                     </div>
 
-                    {/* Logo Derecho */}
+                    {/* Logo Derecho + Metadatos Formato */}
                     <div className="col-span-3 border-l border-slate-200 pl-2 flex flex-col items-center justify-center min-h-[64px]">
                       {plantillaEnEdicion.logoDerechoUrl ? (
                         <img
                           src={plantillaEnEdicion.logoDerechoUrl}
                           alt="Logo Derecho"
-                          className="h-14 max-w-full object-contain"
+                          className="h-12 max-w-full object-contain mb-1"
                         />
                       ) : (
-                        <span className="text-[10px] text-slate-400 italic">Logo Derecho</span>
+                        <span className="text-[10px] text-slate-400 italic mb-1">Logo Derecho</span>
+                      )}
+                      <span className="text-[8px] font-mono font-bold text-slate-600">
+                        {plantillaEnEdicion.codigoFormato} | {plantillaEnEdicion.versionRevision}
+                      </span>
+                      {plantillaEnEdicion.fechaFormato && (
+                        <span className="text-[8px] font-mono text-slate-400">
+                          Fecha: {plantillaEnEdicion.fechaFormato}
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Barra de Muestra de Tabla con Color Primario */}
+                  {/* Barra de Muestra con Color Primario */}
                   <div
                     className="mt-3 px-3 py-1 font-bold text-[10px] uppercase tracking-wider flex items-center justify-between"
                     style={{
@@ -961,224 +1648,34 @@ export const PlantillasConfig: React.FC<PlantillasConfigProps> = ({ usuarioActua
                       color: plantillaEnEdicion.colorTextoEncabezado || DEFAULT_COLOR_TEXTO,
                     }}
                   >
-                    <span>1. DATOS DEL ENSAYO Y RESULTADOS METROLÓGICOS</span>
-                    <span className="text-[8px] opacity-80">NORMA APLICABLE</span>
+                    <span>{plantillaEnEdicion.textosSecciones?.tituloSolicitante || DEFAULT_TEXTOS.tituloSolicitante}</span>
+                    <span className="text-[8px] opacity-80">{plantillaEnEdicion.codigoFormato}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Sección 4: Datos Documentales y Títulos */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Disciplina / Clasificación
-                  </label>
-                  <select
-                    value={plantillaEnEdicion.clasificacionCodigo}
-                    onChange={(e) =>
-                      setPlantillaEnEdicion({
-                        ...plantillaEnEdicion,
-                        clasificacionCodigo: e.target.value as CodigoClasificacion,
-                      })
-                    }
-                    className="w-full border border-slate-300 rounded-lg p-2 bg-white"
-                  >
-                    <option value="VT">VT - Válvulas</option>
-                    <option value="TB">TB - Tubería</option>
-                    <option value="PR">PR - Magnitud Presión</option>
-                    <option value="TM">TM - Magnitud Temperatura</option>
-                    <option value="EL">EL - Magnitudes Eléctricas</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Tipo de Elemento / Aplicación
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Válvula de Control, Válvula On/Off, Manómetro..."
-                    value={plantillaEnEdicion.tipoElemento}
-                    onChange={(e) =>
-                      setPlantillaEnEdicion({ ...plantillaEnEdicion, tipoElemento: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg p-2"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Nombre Identificador de la Plantilla
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Válvulas de Control - Fuga y Recorrido"
-                  value={plantillaEnEdicion.nombreIdentificador}
-                  onChange={(e) =>
-                    setPlantillaEnEdicion({ ...plantillaEnEdicion, nombreIdentificador: e.target.value })
-                  }
-                  className="w-full border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              {/* Títulos bilingües */}
-              <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200 space-y-3">
-                <span className="font-bold text-emerald-900 block flex items-center gap-1.5">
-                  <Languages className="w-4 h-4 text-emerald-600" />
-                  Textos Oficiales del Encabezado
+              {/* Botones de Acción */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">
+                  Pestaña activa: <strong>{tabModal.toUpperCase()}</strong>
                 </span>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Título Oficial en Español (Mayúsculas)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. REPORTE DE PRUEBA DE VALVULAS DE CONTROL"
-                    value={plantillaEnEdicion.tituloReporteEs}
-                    onChange={(e) =>
-                      setPlantillaEnEdicion({
-                        ...plantillaEnEdicion,
-                        tituloReporteEs: e.target.value.toUpperCase(),
-                      })
-                    }
-                    className="w-full border border-slate-300 rounded-lg p-2 font-bold uppercase tracking-tight text-slate-900 bg-white"
-                  />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalAbierto(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-xs cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Guardar Plantilla & Diseño</span>
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Título Oficial en Inglés
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Control Valve Test Report"
-                    value={plantillaEnEdicion.tituloReporteEn}
-                    onChange={(e) =>
-                      setPlantillaEnEdicion({ ...plantillaEnEdicion, tituloReporteEn: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg p-2 italic bg-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Subtítulo / Norma de Referencia por Defecto
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Conforme a Estándar ANSI/FCI 70-2 / IEC 60534-4"
-                  value={plantillaEnEdicion.subtituloNormativo}
-                  onChange={(e) =>
-                    setPlantillaEnEdicion({ ...plantillaEnEdicion, subtituloNormativo: e.target.value })
-                  }
-                  className="w-full border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Código de Formato Documental
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. FOR-MET-VT-02"
-                    value={plantillaEnEdicion.codigoFormato}
-                    onChange={(e) =>
-                      setPlantillaEnEdicion({ ...plantillaEnEdicion, codigoFormato: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg p-2 font-mono uppercase"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Versión / Revisión
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. v1.0 (Rev 01)"
-                    value={plantillaEnEdicion.versionRevision}
-                    onChange={(e) =>
-                      setPlantillaEnEdicion({ ...plantillaEnEdicion, versionRevision: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg p-2 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Declaración de Trazabilidad por Defecto
-                </label>
-                <textarea
-                  rows={2}
-                  value={plantillaEnEdicion.declaracionTrazabilidadPorDefecto || ''}
-                  onChange={(e) =>
-                    setPlantillaEnEdicion({
-                      ...plantillaEnEdicion,
-                      declaracionTrazabilidadPorDefecto: e.target.value,
-                    })
-                  }
-                  className="w-full border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Declaración de Conformidad por Defecto
-                </label>
-                <textarea
-                  rows={2}
-                  value={plantillaEnEdicion.declaracionesConformidadPorDefecto || ''}
-                  onChange={(e) =>
-                    setPlantillaEnEdicion({
-                      ...plantillaEnEdicion,
-                      declaracionesConformidadPorDefecto: e.target.value,
-                    })
-                  }
-                  className="w-full border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="activa"
-                  checked={plantillaEnEdicion.activa}
-                  onChange={(e) =>
-                    setPlantillaEnEdicion({ ...plantillaEnEdicion, activa: e.target.checked })
-                  }
-                  className="rounded text-emerald-600 w-4 h-4"
-                />
-                <label htmlFor="activa" className="font-semibold text-slate-700 cursor-pointer">
-                  Plantilla Activa (disponible para nuevos reportes)
-                </label>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setModalAbierto(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-xs"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Guardar Plantilla & Diseño</span>
-                </button>
               </div>
             </form>
           </div>

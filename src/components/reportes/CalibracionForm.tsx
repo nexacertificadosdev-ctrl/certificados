@@ -7,10 +7,12 @@ import type {
   PuntoCalibracion,
   ReporteCertificado,
   Usuario,
+  GraficaServicio,
 } from '../../types';
 import { storageService } from '../../services/storageService';
 import { Save, Send, ArrowLeft, CheckCircle2, AlertTriangle, Plus, Trash2, Gauge, Calculator } from 'lucide-react';
 import { PatronesSelector } from './PatronesSelector';
+import { GraficasServicioUploader } from '../common/GraficasServicioUploader';
 
 interface CalibracionFormProps {
   reporteInicial?: ReporteCertificado;
@@ -88,6 +90,9 @@ export const CalibracionForm: React.FC<CalibracionFormProps> = ({
   );
   const [fechaPrueba, setFechaPrueba] = useState(
     reporteInicial?.fechaPrueba || new Date().toISOString().split('T')[0]
+  );
+  const [graficasServicio, setGraficasServicio] = useState<GraficaServicio[]>(
+    reporteInicial?.graficasServicio || []
   );
 
   // Magnitud según clasificación
@@ -284,6 +289,7 @@ export const CalibracionForm: React.FC<CalibracionFormProps> = ({
           fechaRecepcion,
           fechaPrueba,
           datosCalibracion: datosFinales,
+          graficasServicio,
         },
         usuarioActual
       );
@@ -320,6 +326,7 @@ export const CalibracionForm: React.FC<CalibracionFormProps> = ({
           fechaRecepcion,
           fechaPrueba,
           datosCalibracion: datosFinales,
+          graficasServicio,
         },
         usuarioActual
       );
@@ -890,6 +897,17 @@ export const CalibracionForm: React.FC<CalibracionFormProps> = ({
             </span>
           </div>
         </div>
+
+        {/* BLOQUE: Representación Gráfica del Ensayo / Calibración */}
+        <GraficasServicioUploader
+          graficas={graficasServicio}
+          onChange={setGraficasServicio}
+          titulosSugeridos={[
+            'Curva de Error Instrumental vs Rango de Medición',
+            'Banda de Incertidumbre Expandida (k=2)',
+          ]}
+          maxGraficas={4}
+        />
 
         {/* BLOQUE 4: Observaciones & Declaraciones */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">

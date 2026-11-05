@@ -5,10 +5,12 @@ import type {
   EquipoInstrumento,
   ReporteCertificado,
   Usuario,
+  GraficaServicio,
 } from '../../types';
 import { storageService } from '../../services/storageService';
 import { Save, Send, ArrowLeft, CheckCircle2, AlertTriangle, Calculator, Activity } from 'lucide-react';
 import { PatronesSelector } from './PatronesSelector';
+import { GraficasServicioUploader } from '../common/GraficasServicioUploader';
 
 interface TuberiaFormProps {
   reporteInicial?: ReporteCertificado;
@@ -81,6 +83,9 @@ export const TuberiaForm: React.FC<TuberiaFormProps> = ({
   );
   const [fechaPrueba, setFechaPrueba] = useState(
     reporteInicial?.fechaPrueba || new Date().toISOString().split('T')[0]
+  );
+  const [graficasServicio, setGraficasServicio] = useState<GraficaServicio[]>(
+    reporteInicial?.graficasServicio || []
   );
 
   // Datos Técnicos de Tubería
@@ -220,6 +225,7 @@ export const TuberiaForm: React.FC<TuberiaFormProps> = ({
           fechaRecepcion,
           fechaPrueba,
           datosTuberia: datosFinales,
+          graficasServicio,
         },
         usuarioActual
       );
@@ -256,6 +262,7 @@ export const TuberiaForm: React.FC<TuberiaFormProps> = ({
           fechaRecepcion,
           fechaPrueba,
           datosTuberia: datosFinales,
+          graficasServicio,
         },
         usuarioActual
       );
@@ -771,6 +778,17 @@ export const TuberiaForm: React.FC<TuberiaFormProps> = ({
             </span>
           </div>
         </div>
+
+        {/* BLOQUE: Representación Gráfica del Ensayo */}
+        <GraficasServicioUploader
+          graficas={graficasServicio}
+          onChange={setGraficasServicio}
+          titulosSugeridos={[
+            'Curva de Presión vs Tiempo - Llenado y Presurización',
+            'Curva de Estabilidad y Despresurización',
+          ]}
+          maxGraficas={4}
+        />
 
         {/* BLOQUE 4: Observaciones & Declaraciones */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">

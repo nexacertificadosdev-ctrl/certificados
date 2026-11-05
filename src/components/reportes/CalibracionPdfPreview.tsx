@@ -372,43 +372,80 @@ export const CalibracionPdfPreview: React.FC<CalibracionPdfPreviewProps> = ({ re
             </div>
           </div>
 
-          {/* Gráfico de Desviación / Curva de Error */}
+          {/* Gráfico de Desviación / Curvas de Calibración */}
           <div className="mb-4">
-            <div className="border border-slate-300 p-2.5 bg-white text-center">
-              <span className="text-[10px] font-bold text-slate-700 block mb-1">
-                Curva de Desviación y Error de Indicación ({d.unidadMedida}) vs. Valor Nominal
-              </span>
-              <svg viewBox="0 0 550 140" className="w-full h-32 bg-slate-50 border border-slate-200">
-                <line x1="30" y1="20" x2="520" y2="20" stroke="#f1f5f9" />
-                <line x1="30" y1="70" x2="520" y2="70" stroke="#94a3b8" />
-                <line x1="30" y1="120" x2="520" y2="120" stroke="#f1f5f9" />
-                <line x1="30" y1="20" x2="30" y2="120" stroke="#94a3b8" />
+            {reporte.graficasServicio && reporte.graficasServicio.filter((g) => g.imagenUrl).length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {reporte.graficasServicio
+                  .filter((g) => g.imagenUrl)
+                  .map((g, idx) => (
+                    <div
+                      key={g.id || idx}
+                      className="border-2 rounded bg-white overflow-hidden flex flex-col shadow-xs"
+                      style={{ borderColor: colorSecundario }}
+                    >
+                      <div
+                        className="px-2 py-1 text-center font-bold text-[10px] uppercase tracking-wide border-b"
+                        style={{
+                          backgroundColor: `${colorSecundario}12`,
+                          color: colorSecundario,
+                          borderColor: `${colorSecundario}30`,
+                        }}
+                      >
+                        {g.titulo || `Gráfica Metrológica #${idx + 1}`}
+                      </div>
+                      <div className="p-2 flex items-center justify-center bg-white min-h-[140px] max-h-[180px] overflow-hidden">
+                        <img
+                          src={g.imagenUrl}
+                          alt={g.titulo}
+                          className="max-h-40 max-w-full object-contain"
+                        />
+                      </div>
+                      {g.pieGrafica && (
+                        <div className="text-[8px] text-slate-500 text-center py-0.5 px-1 bg-slate-50 border-t border-slate-200 italic">
+                          {g.pieGrafica}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="border border-slate-300 p-2.5 bg-white text-center">
+                <span className="text-[10px] font-bold text-slate-700 block mb-1">
+                  Curva de Desviación y Error de Indicación ({d.unidadMedida}) vs. Valor Nominal
+                </span>
+                <svg viewBox="0 0 550 140" className="w-full h-32 bg-slate-50 border border-slate-200">
+                  <line x1="30" y1="20" x2="520" y2="20" stroke="#f1f5f9" />
+                  <line x1="30" y1="70" x2="520" y2="70" stroke="#94a3b8" />
+                  <line x1="30" y1="120" x2="520" y2="120" stroke="#f1f5f9" />
+                  <line x1="30" y1="20" x2="30" y2="120" stroke="#94a3b8" />
 
-                <text x="25" y="24" fontSize="8" textAnchor="end" fill="#64748b">+1.5</text>
-                <text x="25" y="74" fontSize="8" textAnchor="end" fill="#64748b">0.0</text>
-                <text x="25" y="124" fontSize="8" textAnchor="end" fill="#64748b">-1.5</text>
+                  <text x="25" y="24" fontSize="8" textAnchor="end" fill="#64748b">+1.5</text>
+                  <text x="25" y="74" fontSize="8" textAnchor="end" fill="#64748b">0.0</text>
+                  <text x="25" y="124" fontSize="8" textAnchor="end" fill="#64748b">-1.5</text>
 
-                {/* Banda de Tolerancia */}
-                <rect x="30" y="40" width="490" height="60" fill="#22c55e" fillOpacity="0.08" />
-                <line x1="30" y1="40" x2="520" y2="40" stroke="#ef4444" strokeWidth="1" strokeDasharray="3" />
-                <line x1="30" y1="100" x2="520" y2="100" stroke="#ef4444" strokeWidth="1" strokeDasharray="3" />
-                <text x="510" y="36" fontSize="7" fill="#ef4444" textAnchor="end">Límite Superior (+EMP)</text>
-                <text x="510" y="110" fontSize="7" fill="#ef4444" textAnchor="end">Límite Inferior (-EMP)</text>
+                  {/* Banda de Tolerancia */}
+                  <rect x="30" y="40" width="490" height="60" fill="#22c55e" fillOpacity="0.08" />
+                  <line x1="30" y1="40" x2="520" y2="40" stroke="#ef4444" strokeWidth="1" strokeDasharray="3" />
+                  <line x1="30" y1="100" x2="520" y2="100" stroke="#ef4444" strokeWidth="1" strokeDasharray="3" />
+                  <text x="510" y="36" fontSize="7" fill="#ef4444" textAnchor="end">Límite Superior (+EMP)</text>
+                  <text x="510" y="110" fontSize="7" fill="#ef4444" textAnchor="end">Límite Inferior (-EMP)</text>
 
-                {/* Curva de error de subida */}
-                <path
-                  d="M 50,70 L 160,65 L 280,58 L 400,62 L 500,55"
-                  fill="none"
-                  stroke={colorSecundario}
-                  strokeWidth="2"
-                />
-                <circle cx="50" cy="70" r="3" fill={colorSecundario} />
-                <circle cx="160" cy="65" r="3" fill={colorSecundario} />
-                <circle cx="280" cy="58" r="3" fill={colorSecundario} />
-                <circle cx="400" cy="62" r="3" fill={colorSecundario} />
-                <circle cx="500" cy="55" r="3" fill={colorSecundario} />
-              </svg>
-            </div>
+                  {/* Curva de error de subida */}
+                  <path
+                    d="M 50,70 L 160,65 L 280,58 L 400,62 L 500,55"
+                    fill="none"
+                    stroke={colorSecundario}
+                    strokeWidth="2"
+                  />
+                  <circle cx="50" cy="70" r="3" fill={colorSecundario} />
+                  <circle cx="160" cy="65" r="3" fill={colorSecundario} />
+                  <circle cx="280" cy="58" r="3" fill={colorSecundario} />
+                  <circle cx="400" cy="62" r="3" fill={colorSecundario} />
+                  <circle cx="500" cy="55" r="3" fill={colorSecundario} />
+                </svg>
+              </div>
+            )}
           </div>
 
           {/* Declaración de Incertidumbre y Firmas */}

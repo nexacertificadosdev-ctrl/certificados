@@ -244,6 +244,47 @@ export interface HistorialTransicion {
   observaciones?: string;
 }
 
+export interface GraficaServicio {
+  id: string;
+  titulo: string; // ej. "Prueba de Sello / Disparo - Entrada"
+  imagenUrl: string; // Data URL en memoria para el PDF o URL remota
+  subtitulo?: string; // ej. "Curva Presión (psi) vs Tiempo (seg)"
+  pieGrafica?: string;
+  anchoPorcentaje?: number;
+}
+
+export interface SeccionesVisiblesPlantilla {
+  datosSolicitante?: boolean;
+  datosEquipo?: boolean;
+  condicionesAmbientales?: boolean;
+  equiposAuxiliares?: boolean;
+  documentoNormativo?: boolean;
+  trazabilidadMetrologica?: boolean;
+  resultadosPrueba?: boolean;
+  graficasServicio?: boolean;
+  observaciones?: boolean;
+  firmas?: boolean;
+}
+
+export interface TextosSeccionesPlantilla {
+  tituloSolicitante?: string;
+  tituloEquipo?: string;
+  tituloCondiciones?: string;
+  tituloAuxiliares?: string;
+  tituloNormativo?: string;
+  contenidoNormativo?: string;
+  tituloTrazabilidad?: string;
+  contenidoTrazabilidad?: string;
+  tituloResultados?: string;
+  tituloGraficas?: string;
+  titulosGraficasPorDefecto?: string[];
+  tituloObservaciones?: string;
+  contenidoObservaciones?: string;
+  tituloAutorizacion?: string;
+  cargoAutorizador?: string;
+  textoFinReporte?: string;
+}
+
 export interface PlantillaDocumental {
   id: string;
   clasificacionCodigo: CodigoClasificacion;
@@ -252,8 +293,9 @@ export interface PlantillaDocumental {
   tituloReporteEs: string; // ej. "REPORTE DE PRUEBA DE VALVULAS DE CONTROL"
   tituloReporteEn: string; // ej. "Control Valve Test Report"
   subtituloNormativo: string; // ej. "Conforme a Norma ANSI/FCI 70-2 / IEC 60534-4"
-  codigoFormato: string; // ej. "FOR-MET-VT-01"
-  versionRevision: string; // ej. "v1.0 (Rev 03)"
+  codigoFormato: string; // ej. "FOR-PCC-274" o "FOR-MET-VT-01"
+  versionRevision: string; // ej. "Vr: 01" o "v1.0 (Rev 03)"
+  fechaFormato?: string; // ej. "24/03/2026"
   declaracionTrazabilidadPorDefecto?: string;
   declaracionesConformidadPorDefecto?: string;
   logoIzquierdoUrl?: string;
@@ -262,6 +304,8 @@ export interface PlantillaDocumental {
   colorSecundario?: string;
   colorTextoEncabezado?: string;
   activa: boolean;
+  seccionesVisibles?: SeccionesVisiblesPlantilla;
+  textosSecciones?: TextosSeccionesPlantilla;
 }
 
 export interface ReporteCertificado {
@@ -302,6 +346,9 @@ export interface ReporteCertificado {
   datosValvula?: DatosTecnicosValvula;
   datosTuberia?: DatosTecnicosTuberia;
   datosCalibracion?: DatosTecnicosCalibracion;
+  
+  graficasServicio?: GraficaServicio[];
+  fechaFormato?: string;
   
   transiciones: HistorialTransicion[];
   pdfGeneradoUrl?: string;
